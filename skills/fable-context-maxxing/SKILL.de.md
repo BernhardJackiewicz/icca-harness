@@ -13,6 +13,68 @@ description: >
 
 # fable-context-maxxing
 
+## Teil 0: Die Tool-Calling-Entscheidung (Selbst-Triage)
+
+Vor allem anderen wird entschieden, ob diese Aufgabe den Harness
+überhaupt braucht. Die Entscheidung ist explizit, wird aufgezeichnet
+und folgt dem gemessenen Break-even des eigenen Benchmarks, keiner
+Gewohnheit. Die Rollen sind modell-agnostisch: "Orchestrator" ist das
+starke Modell der Session, "Implementierer" eine günstigere Stufe, an
+die delegiert wird. Gemessen wurden ein Frontier-Orchestrator, der an
+einen starken Implementierer delegiert (Token-Verteilung), und
+schwache Implementierer-Stufen unter Gates (Gate-Nutzen); andere
+Paarungen, auch lokale Modelle als Implementierer, erben die Mechanik,
+nicht die Zahlen.
+
+Drei Stufen:
+
+**solo** (kein Harness): direkt in der Session implementieren. Wenn
+ALLE Kriterien gelten: eine Datei oder trivial lokalisierbar; der
+erwartete Diff ist auf einen Blick reviewbar; das fehlerhafte
+Verhalten spezifiziert den Fix vollständig; keine öffentliche
+Schnittstelle, Persistenz, Security-, Audit- oder Idempotenzfläche.
+Mechanik: trotzdem `RP exempt --reason "triage: solo - <warum>"`
+ausführen, damit die Hooks ehrlich bleiben und die Entscheidung
+protokolliert ist. Messbasis: beim kleinen Ein-Modul-Task (ein
+Greenfield-Modul) kostete Delegation 7% MEHR auf dem teuren Modell und
+119% mehr insgesamt bei gleichem Ergebnis; und im gepaarten Benchmark
+verlor der inline-Arm auf der Klasse kleiner Tasks über 12 Paare keine
+Hidden-Suite-Passes gegen den delegierten Arm, bei 0.45x seiner
+Median-Gesamtkosten, alle 24 Läufe hidden-grün.
+
+**light** (der Default für echte Arbeit): der volle Commit-Zyklus
+dieses Skills (Contract, Red, Freeze, delegierte Implementierung,
+Targeted- und Full-Suite, Diff-Review, Attest, Commit-Gate) OHNE
+zusätzliche `--require`-Gates. Wenn eines gilt: die Änderung geht
+über Module; die Anforderungen sind interpretationsbedürftig; die
+Implementierung bedeutet viel Suchen, viele Tool-Calls oder lange
+Testläufe. Messbasis: bei implementierungslastiger Arbeit sparte der
+delegierte Zyklus 28% Tokens auf dem teuren Modell bei identischer
+Erfolgsrate (16.576 zu 11.864), während der Gesamtverbrauch über
+beide Modelle um 37% stieg; gekauft wird Reichweite auf dem teuren
+Modell, nicht Gesamtsparsamkeit.
+
+**full** (light plus deklarierte Gates): dazu `--require static` (und
+`quality`, `coverage`, wo der Contract es rechtfertigt),
+Checker-Agenten in frischen Kontexten und ein finaler Audit. Wenn
+"Tests grün" als Evidenz nicht reicht: Security-, Persistenz-,
+Audit-Trail-, Idempotenz- oder Mandantentrennungs-Fläche; oder wenn
+die Implementierer-Stufe schwach ist (günstige oder lokale Modelle)
+UND die Spezifikation beispielbasiert ist, sodass ein plausibler
+Beinahe-Treffer die sichtbaren Tests bestehen würde. Messbasis: das
+Stufe-1-Gate wandelte echte verdeckte Fehlschläge genau in diesem
+Fenster um (schwacher Implementierer, beispielbasierte Spec); mit
+einem Frontier-Implementierer maß es nichts (net 0), und mit der
+Sonnet-Stufe ebenfalls keinen Rückhalt (net -1 über 12 Paare).
+
+Mutation- und Property-Gates sind nie Default: im Benchmark fanden sie
+denselben seltenen Blind-Spot-Defekt, den die günstigeren Gates
+übersahen, verdienten ihre Kosten aber nicht (3.08x bei Stufe 2). Das
+Quality-Ceilings-Gate existiert, ist aber ungemessen (seine Hypothese
+ist unfinanziert registriert). Solche Gates werden bewusst nur auf
+blockabschließenden Contracts kritischen Codes deklariert. (Alle
+Zahlen aus dem Entwicklungs-Benchmark dieses Workflows.)
+
 ## Teil 1: Subscription-Maximierung (zuerst lesen)
 
 Fable ist das teuerste und knappste Kontingent der Subscription. Dieses
@@ -115,7 +177,7 @@ Der Orchestrator schreibt die verbindlichen Akzeptanz- und Regressionstests. Es 
 
 **Git-Index-Eigentum**: Nur der Orchestrator darf `git add` ausführen, Staging verändern und Commits erstellen. Opus darf niemals stagen, den Index verändern oder committen.
 
-Der Orchestrator staged vor der Delegation die verbindlichen Akzeptanztests. Anschließend wird ein Freeze-Fingerprint über den eingefrorenen Test-Patch erzeugt (Testpfade, Testnamen, Hash des Acceptance-Test-Patches, Hash des Commit-Contracts).
+Der Orchestrator staged vor der Delegation die verbindlichen Akzeptanztests. Vor dem Staging lässt er den Projekt-Linter über die Acceptance-Test-Dateien laufen, die er einfrieren wird; ein Befund wird vor dem Freeze behoben, nie danach per Amendment. Anschließend wird ein Freeze-Fingerprint über den eingefrorenen Test-Patch erzeugt (Testpfade, Testnamen, Hash des Acceptance-Test-Patches, Hash des Commit-Contracts).
 
 **Freeze-Regel**: Während der Implementierung darf Opus eingefrorene Tests nicht verändern. Vor der Abnahme wird mechanisch geprüft: staged Test-Patch byte-identisch; keine Working-Tree-Änderungen an eingefrorenen Tests; keine Assertions entfernt oder verändert; kein `skip`/`xfail` hinzugefügt. Mismatch bedeutet automatische Ablehnung, keine Ermessensentscheidung.
 

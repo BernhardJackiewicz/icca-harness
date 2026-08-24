@@ -13,6 +13,64 @@ description: >
 
 # fable-context-maxxing
 
+## Part 0: The tool-calling decision (self-triage)
+
+Before anything else, decide whether this task needs the harness at
+all. The decision is explicit, recorded, and follows the measured
+break-even of this repository's own benchmark, not a habit. The roles
+are model-agnostic: "orchestrator" is whatever strong model runs the
+session, "implementer" is a cheaper tier it delegates to. The measured
+pairs were a frontier orchestrator delegating to a strong implementer
+(the token split) and cheap implementer tiers under gates (the gate
+value); other pairings, including local models as implementers,
+inherit the mechanics but not the numbers.
+
+Three tiers:
+
+**solo** (no harness): implement directly in the session. Choose it
+when ALL of these hold: the change is one file or trivially localized;
+the expected diff is small enough to review in one glance; the failing
+behavior fully specifies the fix; no public interface, persistence,
+security, audit or idempotency surface is touched. Mechanics: still
+run `RP exempt --reason "triage: solo - <why>"` so the hooks stay
+honest and the decision is logged. Measured basis: on the small
+one-module task (a greenfield module), delegation cost 7% MORE on the
+expensive model and 119% more in total at the same outcome; and in the
+paired benchmark on the small-task class, the inline arm lost no
+hidden-suite passes against the delegated arm over 12 pairs, at 0.45x
+its median total cost, all 24 runs hidden-green.
+
+**light** (the default for real work): the full commit cycle of this
+skill (contract, red, freeze, delegated implementation, targeted and
+full suite, diff review, attest, commit gate) with NO extra `--require`
+gates. Choose it when any of these hold: the change spans modules; the
+requirements need interpretation; the implementation will involve much
+searching, many tool calls, or long test runs. Measured basis: on an
+implementation-heavy task the delegated cycle spent 28% fewer tokens
+on the expensive model at an identical success rate (16,576 to 11,864),
+while total tokens across both models rose 37%; you buy expensive-model
+reach, not total economy.
+
+**full** (light plus declared gates): add `--require static` (and
+`quality`, `coverage` where the contract warrants), checker agents in
+fresh contexts, and a final audit. Choose it when "tests green" is not
+sufficient evidence: security, persistence, audit-trail, idempotency
+or tenant-isolation surface; or when the implementer tier is weak
+(cheap or local models) AND the spec is example-specified, so a
+plausible near-miss would pass the visible tests. Measured basis: the
+stage-1 gate converted real hidden failures only in exactly that
+window (weak implementer, example-specified spec); with a frontier
+implementer it measured nothing (net 0), and with the sonnet tier it
+measured no support either (net -1 over 12 pairs).
+
+Mutation and property gates are never a default: in the benchmark they
+found the same rare blind-spot defect the cheaper gates missed, but
+did not earn their cost (3.08x on stage 2). The quality-ceilings gate
+exists but is unmeasured (its hypothesis is registered unfunded).
+Declare such gates only on block-closing contracts of critical code,
+deliberately. (All numbers from the development benchmark of this
+workflow.)
+
 ## Part 1: Making the subscription go further (read this first)
 
 Fable is the most expensive and scarcest allowance in the subscription.
@@ -156,9 +214,11 @@ change staging, or create commits. Opus may never stage, touch the index,
 or commit.
 
 Before delegating, the orchestrator stages the binding acceptance tests.
-A freeze fingerprint is then taken over the frozen test patch (test
-paths, test names, hash of the acceptance-test patch, hash of the commit
-contract).
+Before staging, the orchestrator runs the project linter over the
+acceptance-test files it is about to freeze; a finding is fixed before
+the freeze, never amended after. A freeze fingerprint is then taken
+over the frozen test patch (test paths, test names, hash of the
+acceptance-test patch, hash of the commit contract).
 
 **Freeze rule**: during implementation Opus may not modify frozen tests.
 Before acceptance this is checked mechanically: the staged test patch is
