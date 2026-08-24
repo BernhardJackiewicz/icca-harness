@@ -265,6 +265,30 @@ both gates.
 
 ## Usage
 
+### What happens when you just ask for a change
+
+You do not invoke any of this by hand. You state the task; the skill
+loads because it is registered as the mandatory workflow; its Part 0
+triage runs as the first step and the agent classifies the task
+itself:
+
+- **solo**: the agent records a logged exemption with a
+  `triage: solo` reason and implements directly in the session.
+- **light**: the agent runs the full cycle below (contract, red,
+  freeze, delegated implementation, suites, diff review, commit gate)
+  with no extra gates. This is the default for real work.
+- **full**: only when the criteria demand it, the cycle additionally
+  declares `--require` gates run by independent checker agents.
+
+The classification is a logged judgment, not a classifier program:
+every path leaves a record (an exemption line or a contract), the
+hooks refuse production edits before one exists, and a word from you
+("solo", "full cycle") overrides the triage. When the call is
+genuinely borderline, the agent takes the higher tier: a too-careful
+classification costs tokens, a too-loose one ships unchecked code.
+
+### The gate CLI underneath
+
 ```bash
 RP() { python3 ~/.claude/red-proof/red_proof.py "$@"; }
 
