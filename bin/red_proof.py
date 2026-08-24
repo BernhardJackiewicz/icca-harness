@@ -951,7 +951,7 @@ def hook_edit(data):
              "Commit Contract before further production changes: "
              "%s contract --file <contract.md>" % CLI)
     deny("red-proof: no active cycle for this repository. Production-code "
-         "changes require the red-proof cycle (load the fable-context-maxxing skill). "
+         "changes require the red-proof cycle (load the icca-harness skill). "
          "Start with: %s contract --file <contract.md>. For an exempt task "
          "(research, docs-only, trivial typo), classify it explicitly: "
          "%s exempt --reason '<why>'" % (CLI, CLI))

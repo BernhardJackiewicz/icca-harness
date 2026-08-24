@@ -18,13 +18,13 @@ while [ $# -gt 0 ]; do
   esac
 done
 case "$LANG_CHOICE" in
-  en) SKILL_SRC="$SRC/skills/fable-context-maxxing/SKILL.md" ;;
-  de) SKILL_SRC="$SRC/skills/fable-context-maxxing/SKILL.de.md" ;;
+  en) SKILL_SRC="$SRC/skills/icca-harness/SKILL.md" ;;
+  de) SKILL_SRC="$SRC/skills/icca-harness/SKILL.de.md" ;;
   *)  echo "error: --lang must be en or de (got '$LANG_CHOICE')" >&2; exit 2 ;;
 esac
 [ -f "$SKILL_SRC" ] || { echo "error: missing $SKILL_SRC" >&2; exit 1; }
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-SKILL_DIR="$CLAUDE_DIR/skills/fable-context-maxxing"
+SKILL_DIR="$CLAUDE_DIR/skills/icca-harness"
 GATE_DIR="$CLAUDE_DIR/red-proof"
 SETTINGS="$CLAUDE_DIR/settings.json"
 
@@ -98,6 +98,6 @@ Remaining manual step: append the block in
 to your global $CLAUDE_DIR/CLAUDE.md, so the skill is loaded before the
 first production-code change instead of after it.
 
-Verify in a fresh terminal: /skills lists fable-context-maxxing,
+Verify in a fresh terminal: /skills lists icca-harness,
 /hooks shows both PreToolUse gates.
 EOF

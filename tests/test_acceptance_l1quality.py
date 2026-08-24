@@ -99,5 +99,5 @@ def test_the_reference_command_is_documented():
     assert "RP check quality -- " in readme
     assert "xenon" in readme.split("RP check quality")[1][:200]
     for name in ("SKILL.md", "SKILL.de.md"):
-        body = (REPO_ROOT / "skills" / "fable-context-maxxing" / name).read_text()
+        body = (REPO_ROOT / "skills" / "icca-harness" / name).read_text()
         assert "check quality" in body

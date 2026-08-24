@@ -1,17 +1,18 @@
 ---
-name: fable-context-maxxing
+name: icca-harness
 description: >
-  Mandatory development workflow for any task that changes production code,
-  fixes a bug, adds a feature, performs a refactor, or creates a commit.
-  MUST be loaded before implementation begins. Maximizes the Fable
-  subscription (lean orchestrator context, delegation to Opus subagents,
-  index navigation, evidence ledger) and enforces Commit Contract, Red
-  Proof, frozen acceptance tests, delegated implementation, independent
-  verification, bounded repair loops, Commit Gate, and requirement-first
-  audit via global hooks.
+  ICCA names the four separated roles that carry the method:
+  Implementer, Checker, Control, Auditor. Mandatory development workflow
+  for any task that changes production code, fixes a bug, adds a feature,
+  performs a refactor, or creates a commit. MUST be loaded before
+  implementation begins. Keeps the orchestrator's context lean (delegation
+  to a cheaper implementer tier, index navigation, evidence ledger) and
+  enforces Commit Contract, Red Proof, frozen acceptance tests, delegated
+  implementation, independent verification, bounded repair loops, Commit
+  Gate, and requirement-first audit via global hooks.
 ---
 
-# fable-context-maxxing
+# icca-harness
 
 ## Part 0: The tool-calling decision (self-triage)
 
@@ -73,19 +74,20 @@ workflow.)
 
 ## Part 1: Making the subscription go further (read this first)
 
-Fable is the most expensive and scarcest allowance in the subscription.
-This setup is built so that Fable tokens go almost entirely into
-decisions rather than volume:
+The session's strong model is the most expensive and scarcest allowance
+in the subscription. This setup is built so that the expensive model's
+tokens go almost entirely into decisions rather than volume:
 
-1. **Implementation is delegated.** Opus subagents (`model: "opus"`)
-   write the production code in their own fresh contexts. Long
-   implementation transcripts, search runs, dead ends and test output
-   consume Opus allowance, not the Fable window. Fable sees only the
-   compact structured return.
-2. **Contract handoffs instead of carried history.** The handoff to Opus
-   is a small, self-contained commit contract. The codebase does not get
-   re-explained every round, and the Fable context never has to hold
-   implementation detail.
+1. **Implementation is delegated.** Implementer subagents
+   (`model: "opus"`) write the production code in their own fresh
+   contexts. Long implementation transcripts, search runs, dead ends and
+   test output consume the cheaper tier's allowance, not the
+   orchestrator's window. The orchestrator sees only the compact
+   structured return.
+2. **Contract handoffs instead of carried history.** The handoff to the
+   implementer is a small, self-contained commit contract. The codebase
+   does not get re-explained every round, and the orchestrator's context
+   never has to hold implementation detail.
 3. **Index navigation instead of file dumps.** `codebase-memory-mcp`
    (`search_code`, `get_code_snippet`, `search_graph`, `trace_path`)
    returns targeted snippets. Full files are read only for the hunks that
@@ -101,13 +103,13 @@ decisions rather than volume:
    costs nothing from the main window. It is also less anchored, since it
    never sees the "all done" summaries.
 7. **Mechanical gates instead of model discipline.** Freeze and commit
-   gates are checked deterministically by hooks and a CLI. Fable does not
-   have to hold or repeat the process state; it lives in
-   `~/.claude/red-proof/state/`.
+   gates are checked deterministically by hooks and a CLI. The
+   orchestrator does not have to hold or repeat the process state; it
+   lives in `~/.claude/red-proof/state/`.
 
-The effect: the Fable window holds the plan, the contracts, the diffs and
-the decisions. All the volume (implementing, searching, test runs, audit)
-happens in delegated or fresh contexts.
+The effect: the orchestrator's window holds the plan, the contracts, the
+diffs and the decisions. All the volume (implementing, searching, test
+runs, audit) happens in delegated or fresh contexts.
 
 ## Part 2: The enforced commit cycle (red-proof)
 
@@ -115,8 +117,8 @@ happens in delegated or fresh contexts.
 
 Development follows a strictly separated maker-checker-auditor model:
 
-- Orchestrator (the session's main model, currently Fable 5):
-  orchestration, deriving requirements, commit planning, test
+- Orchestrator (the session's strong model, currently a Fable-class
+  model): orchestration, deriving requirements, commit planning, test
   specification, red proof, review, verification, staging and the commit
   decision.
 - Opus (implementer): implementation and repair of production code, and

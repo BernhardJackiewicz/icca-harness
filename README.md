@@ -1,10 +1,14 @@
-# fable-context-maxxing
+# icca-harness
 
-**Get about 40% more out of a Fable subscription: on implementation-heavy
-work this workflow spends 28% fewer tokens on the expensive model, at an
-identical success rate.** The orchestrator's context holds decisions; the
-volume (implementation, search, test output, audit) runs in delegated or
-fresh contexts.
+**Get about 40% more out of an expensive-model subscription: on
+implementation-heavy work this workflow spends 28% fewer tokens on the
+expensive model, at an identical success rate.** The orchestrator's
+context holds decisions; the volume (implementation, search, test output,
+audit) runs in delegated or fresh contexts.
+
+ICCA names the four separated roles that carry the method: Implementer,
+Checker, Control, Auditor. The harness is the machinery around them, not
+an agent itself.
 
 Measured over 16 paired runs, not estimated: cost is read from the `usage`
 field of every response and the raw per-run data ships in this repository.
@@ -315,8 +319,8 @@ value is stated further down, honestly.
 Requires Claude Code, Python 3.8 or newer, and git.
 
 ```bash
-git clone https://github.com/BernhardJackiewicz/fable-context-maxxing.git
-cd fable-context-maxxing
+git clone https://github.com/BernhardJackiewicz/icca-harness.git
+cd icca-harness
 ./install.sh
 ```
 
@@ -586,8 +590,8 @@ this repository argues against.
 
 | Path | Purpose |
 |---|---|
-| `skills/fable-context-maxxing/SKILL.md` | the workflow as an installable Claude Code skill (English, default) |
-| `skills/fable-context-maxxing/SKILL.de.md` | the same skill in German, the language it was written in |
+| `skills/icca-harness/SKILL.md` | the workflow as an installable Claude Code skill (English, default) |
+| `skills/icca-harness/SKILL.de.md` | the same skill in German, the language it was written in |
 | `bin/red_proof.py` | gate CLI and hook entry point, no dependencies |
 | `examples/settings-hooks.json` | the hook block, for manual merging |
 | `examples/CLAUDE.md.snippet` | the global instruction that triggers the skill |
@@ -598,9 +602,11 @@ this repository argues against.
 | `bench/results.json` | raw per-run data for the 16 reported runs |
 | `bench/README.md` | the method, and what it cannot tell you |
 
-Two names, one thing: the skill and this repository are
-`fable-context-maxxing`, because context economy is the first design
-goal. The verification mechanism inside is called red-proof, after the
+Two names, one thing: the skill and this repository are `icca-harness`,
+after the four separated roles the method rests on (Implementer,
+Checker, Control, Auditor) and the harness that keeps them apart; the
+name is model-neutral on purpose, because the mechanics are. The
+verification mechanism inside is called red-proof, after the
 part of it that is unusual: it is not enough that tests exist, the red
 itself has to be established as a valid proof before implementation
 starts.
@@ -615,7 +621,7 @@ English is the default. The installer picks which skill body it writes:
 SKILL_LANG=de ./install.sh
 ```
 
-Both files live in `skills/fable-context-maxxing/` as `SKILL.md` and
+Both files live in `skills/icca-harness/` as `SKILL.md` and
 `SKILL.de.md`, and both carry the same English frontmatter description,
 which is what triggers automatic loading, so auto-invocation behaves
 identically either way. The German file is the original the method was
