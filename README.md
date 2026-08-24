@@ -322,6 +322,7 @@ repository:
 
 ```
 RP check static -- sh -c "ruff check bin/ bench/*.py && xenon --max-absolute C bin/"
+RP check quality -- sh -c "xenon --max-absolute C --max-modules B --max-average A bin/ && python3 -c \"import pathlib, sys; big = [str(p) for p in pathlib.Path('bin').rglob('*.py') if len(p.read_text().splitlines()) > 1200]; sys.exit(1 if big else print('module sizes ok'))\""
 RP check coverage --min 40 -- sh -c "python3 -m coverage run -m pytest -q tests/ && python3 -m coverage report --include='bin/red_proof.py'"
 RP check mutation --min 80 -- sh -c "mutmut run && mutmut results"
 RP check property -- python3 -m pytest -q tests/ --hypothesis-seed=1234
@@ -338,6 +339,14 @@ touching a file, and its failure counts on from the previous attempt.
 property gate is not one of them: its metric is the seed the caller
 passed in, and a threshold on an input grades the input instead of the
 run, so `--min` on it is refused before anything is executed.
+
+`quality` is the ceilings gate (complexity and module size), separate
+from `static`, which carries the lint ruleset; a ceiling belongs in the
+command, so the gate is exit-code gated and refuses `--min` like every
+check without an extractor. The ceilings above are this repository's
+honest current numbers: the worst block in `bin/` ranks C, the module
+average ranks A, and the only module under `bin/` is 1072 lines against
+the 1200-line cap.
 
 Thresholds are set per contract, not globally: a cheap gate runs on
 every declaring commit, an expensive one only on block-closing

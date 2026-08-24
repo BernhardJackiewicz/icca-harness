@@ -148,6 +148,8 @@ CHECKS = {
                    "extract": None, "extract_from": "output"},
     "static": {"evidence_key": "static", "staleness": "strict",
                "extract": None, "extract_from": "output"},
+    "quality": {"evidence_key": "quality", "staleness": "strict",
+                "extract": None, "extract_from": "output"},
     "coverage": {"evidence_key": "coverage", "staleness": "strict",
                  "extract": extract_coverage, "extract_from": "output"},
     "mutation": {"evidence_key": "mutation", "staleness": "production",
@@ -778,6 +780,11 @@ def cmd_check(argv):
         "output_tail": output[-OUTPUT_TAIL_CHARS:],
         "metrics": metrics,
         "min": minimum,
+        # Only the green path reaches this record: every failure above
+        # counts an attempt and exits. The flag states that in the entry
+        # itself, so a reader of the state file does not have to know the
+        # code to tell what an existing entry means.
+        "passed": True,
     }
     # A green run closes the repair loop for this check: the next failure
     # starts counting from one again.

@@ -147,7 +147,7 @@ Kompakte strukturierte Rückgabe: geänderte Dateien, erfüllte Akzeptanzkriteri
 
 **6.5 Scope Review**: Änderungen außerhalb des Contracts, unnötige Refactorings, unbeabsichtigte API-Änderungen, neue Persistenz, neue personenbezogene Kopien, Audit-/Security-/Idempotenz-Auswirkungen, Freeze-Invarianten.
 
-**6.6 Constraint Gate (Stufe 1)**: Static Analysis und Coverage laufen in jedem Commit-Zyklus, dessen Contract sie deklariert (`RP contract --require static,coverage`). Ausgeführt werden sie von unabhängigen Checker-Agenten, niemals vom Orchestrator und niemals vom Implementierer.
+**6.6 Constraint Gate (Stufe 1)**: Static Analysis, die Quality-Obergrenzen und Coverage laufen in jedem Commit-Zyklus, dessen Contract sie deklariert (`RP contract --require static,quality,coverage`). Ausgeführt werden sie von unabhängigen Checker-Agenten, niemals vom Orchestrator und niemals vom Implementierer.
 
 **Checker-Agenten-Muster**: Ein Checker startet in frischem Kontext über das Agent-Tool. Er erhält: Repository-Pfad, das exakte Check-Kommando inklusive Schwelle, die für sein Gate relevanten Akzeptanzkriterien des Contracts und das erwartete Reportformat (PASS oder FAIL, Messwert, Top-Befunde als Datei:Zeile). Er erhält nicht: Implementierer-Transkripte, die Implementierer-Rückgabe, frühere Nachweise oder Einschätzungen des Orchestrators. Der Checker führt `RP check <name> ...` selbst aus; der Nachweis ist damit mechanisch an den Code-Fingerprint gebunden und kann nicht behauptet werden. Befunde gehen als Grundlage für Defect Contracts (Abschnitt 7) an den Orchestrator zurück; der Checker repariert nie.
 
@@ -211,6 +211,7 @@ RP check freeze
 RP check targeted -- <testcmd>
 RP check full-suite -- <suitecmd>
 RP check static -- <lintcmd>                # Exit-Code-Gate, ausgeführt vom Checker-Agenten
+RP check quality -- <Ceilings-Kommando>     # Exit-Code-Gate: Komplexitäts- und Größenobergrenzen
 RP check coverage --min 90 -- <covcmd>      # Metrik-Gate, Schwelle mechanisch erzwungen
 RP check mutation --min 80 -- <mutcmd>      # Block-Gate-Stufe: überlebt reine Test-Edits
 RP check property -- <cmd mit --hypothesis-seed=N>   # läuft nicht ohne fixierten Seed

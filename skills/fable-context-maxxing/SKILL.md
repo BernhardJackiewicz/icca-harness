@@ -222,9 +222,9 @@ refactorings, unintended API changes, new persistence, new copies of
 personal data, audit, security and idempotency effects, freeze
 invariants.
 
-**6.6 Constraint gate (stage 1)**: static analysis and coverage run in
-every commit cycle whose contract declares them
-(`RP contract --require static,coverage`). They are executed by
+**6.6 Constraint gate (stage 1)**: static analysis, the quality ceilings
+and coverage run in every commit cycle whose contract declares them
+(`RP contract --require static,quality,coverage`). They are executed by
 independent checker agents, never by the orchestrator and never by the
 implementer.
 
@@ -359,6 +359,7 @@ RP check freeze
 RP check targeted -- <testcmd>
 RP check full-suite -- <suitecmd>
 RP check static -- <lintcmd>                # exit-code gate, run by a checker agent
+RP check quality -- <ceilings cmd>          # exit-code gate: complexity and size ceilings
 RP check coverage --min 90 -- <covcmd>      # metric gate, threshold enforced mechanically
 RP check mutation --min 80 -- <mutcmd>      # block-gate stage: survives test-only edits
 RP check property -- <cmd with --hypothesis-seed=N>   # refuses to run unseeded
