@@ -390,6 +390,64 @@ value window, not as universally paid-for protection, and expect their
 main worth on real work to be the discipline they enforce rather than a
 measured defect reduction.
 
+## Tested and untested, in one place
+
+Everything below was measured in the development benchmark: paired
+runs against hidden test suites the agent never sees, decision rules
+registered before the first run, every verdict re-derived by a fresh
+context from the raw data.
+
+Measured:
+
+- **Delegation pays on implementation-heavy work, and only there.**
+  28% fewer tokens on the expensive model at an identical success rate
+  (16,576 to 11,864), while total tokens across both models rose 37%.
+  On the small one-module task the same setup cost 7% more on the
+  expensive model and 119% more in total.
+- **Small, fully specified tasks do not need the harness.** Direct
+  implementation in the session lost no hidden-suite passes against
+  delegation over 12 pairs, at 0.45x the median cost, all runs
+  hidden-green. This is the measured basis of the solo tier in the
+  skill's Part 0.
+- **The stage-1 gate has one narrow value window.** It converted
+  plausible near-misses into hidden passes only for a weak implementer
+  working from an example-specified task (net +4 over 25 pairs, 1.48x
+  cost). With a frontier implementer: net 0. With a mid-tier
+  implementer: net -1 over 12 pairs. On tasks that state their rules
+  outright: all ties.
+- **Mutation and property stages do not earn their cost.** Each
+  converted an occasional blind spot the cheaper gates missed; the
+  mutation stage did it at 3.08x the cost median against a registered
+  2.0x limit, the property stage's evidence never left 1.5 against an
+  accept threshold of 20 before the registered budget stop.
+- **Fix-shaped tasks are solvable without a gate.** Once measurable
+  under a recorded orchestrator choice (zero refusal aborts in 64
+  runs), both arms were hidden-green throughout: 32 ties out of 32
+  pairs, nothing for the gate to convert.
+
+Not measured, stated as such:
+
+- **The quality-ceilings gate.** Built and documented above; its
+  hypothesis is registered but unfunded. Until measured it is a
+  mechanism, not a claim.
+- **The real Claude Code loop.** All numbers come from a harness that
+  imitates the loop. Running the same tasks through real sessions on
+  two separate keys would close the gap and has not been done.
+- **Realistic repositories.** The benchmark runs on small synthetic
+  packages; one brownfield fixture (a working multi-module package
+  with a feature ask) exists as measurement surface and has not been
+  measured on.
+- **Dependency-structure and end-to-end stages.** Design documents
+  only.
+- **Field causality.** A descriptive field report can count cycles,
+  gate runs and findings; whether the workflow reduces regressions in
+  real work has no comparison arm and therefore no number. A
+  prospective design exists on paper.
+- **Transfer to other pairings.** The numbers are bound to the
+  measured model pairs and to one developer's tasks and style. Other
+  orchestrators and implementers, including local models, inherit the
+  mechanics, not the numbers.
+
 ## Limits
 
 Stated deliberately, because a workflow that overclaims is the thing
