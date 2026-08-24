@@ -195,6 +195,8 @@ Three roles remove the incentive structurally:
 |---|---|
 | Orchestrator | requirements, commit contracts, acceptance tests, red proof, review, verification, staging, commits |
 | Implementer (Opus subagent) | production code and repairs, nothing else |
+| Checker agents (one fresh context per gate) | running the declared stage gates themselves; they never see implementer transcripts and never repair |
+| Control agent (optional, larger plans) | reviewing a finished cycle against its contract before the block audit |
 | Auditor (fresh context) | independent requirement-first completeness acceptance |
 
 The rule that carries the whole thing: the agent that implements never
@@ -208,10 +210,14 @@ decides whether its own implementation is accepted.
    already exists.
 2. **Red phase, before any implementation.** The orchestrator writes the
    binding acceptance tests and proves they fail for the right reason.
-   Two kinds of red are legitimate: *behavior red* for an interface that
-   already exists, and *contract red* for a symbol the contract
+   Three kinds of red are legitimate: *behavior red* for an interface
+   that already exists, *contract red* for a symbol the contract
    deliberately introduces, where `ModuleNotFoundError` is the expected
-   proof rather than a setup error. Syntax errors, wrong import paths
+   proof rather than a setup error, and *scenario red* for acceptance
+   criteria written as Gherkin scenarios, where a failing step or a
+   missing step definition is the proof and the `.feature` file is
+   frozen together with its step skeletons as specification, not
+   production code. Syntax errors, wrong import paths
    and broken fixtures are never valid red. This is why the orchestrator
    never has to write a production stub.
 3. **Mechanical freeze.** The acceptance tests are staged and
@@ -241,6 +247,68 @@ A green test run is necessary and not sufficient. The final claim is
 never "the feature is correct" but "the feature demonstrably matches the
 specified requirements, to the extent audit and verification cover
 them".
+
+## The whole harness on one page
+
+Bottom line up front: this is a mechanically enforced
+maker-checker-auditor workflow around every commit, with a recorded
+self-triage in front of it. No model accepts its own work, and every
+piece of evidence is bound to the exact code state instead of being
+asserted. Everything below exists today; which parts have measured
+value is stated further down, honestly.
+
+**Decision layer**
+1. Self-triage (Part 0 of the skill): solo, light or full, decided by
+   the agent itself, always logged, overridable with a word.
+
+**Specification layer**
+2. Commit contracts with requirement provenance, so no acceptance
+   criterion can be back-derived from code that already exists.
+3. Red proof with three red kinds: behavior red, contract red, and
+   scenario red (Gherkin feature files as frozen specification with
+   step skeletons). The CLI refuses to record a red that exited 0.
+4. Mechanical freeze of the acceptance tests by patch fingerprint,
+   with a lint pass over the files before they freeze.
+
+**Role separation**
+5. The implementer (a delegated subagent in a fresh context) writes
+   production code and nothing else: never stages, never commits,
+   never touches frozen tests.
+6. Checker agents, one fresh context per declared gate, run their
+   check themselves and never repair.
+7. A control agent on larger plans, and a requirement-first auditor in
+   a fresh context that interprets the original requirements itself
+   and never sees "all done" summaries.
+
+**Stage gates, opt-in per contract**
+8. Static analysis, quality ceilings (complexity and module size,
+   built but unmeasured) and coverage with a mechanical threshold.
+9. A mutation gate (kill-rate floor, evidence survives test-only
+   edits) and a seed-enforced property gate. Both measured: each
+   converts an occasional blind spot, neither earned its cost, so
+   they belong on block-closing contracts of critical code only.
+
+**Mechanical enforcement**
+10. Hooks deny production edits without an active cycle or logged
+    exemption, and `git commit` without a passed gate.
+11. A content fingerprint binds all evidence to HEAD plus file
+    contents: one edited line after verification invalidates the
+    gate. One gate, exactly one commit.
+12. A snapshot guard and bounded repair loops: two repairs per
+    defect, then re-planning instead of an endless patch loop.
+13. An evidence ledger entry per commit.
+
+**The science layer behind the claims**
+14. The numbers in this README come from a development benchmark:
+    paired runs against hidden test suites the agent never sees, with
+    reference and witness implementations proving each fixture can
+    separate right from plausibly wrong, and decision rules registered
+    before the first run.
+15. The workflow improves itself only through a refinement loop of
+    typed, judged, rollbackable proposals, in which a proposal that
+    loosens any gate cannot even enter the ledger without declaring a
+    measurement obligation. The loop's first round is on record,
+    including one proposal its own judge rejected.
 
 ## Install
 
