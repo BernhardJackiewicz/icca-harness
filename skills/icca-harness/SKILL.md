@@ -422,6 +422,8 @@ RP check targeted -- <testcmd>
 RP check full-suite -- <suitecmd>
 RP check static -- <lintcmd>                # exit-code gate, run by a checker agent
 RP check quality -- <ceilings cmd>          # exit-code gate: complexity and size ceilings
+RP check deps -- <import-graph cmd>         # exit-code gate: cycles and layering
+RP check e2e -- <scenario cmd>              # exit-code gate: the wired artifact end to end
 RP check coverage --min 90 -- <covcmd>      # metric gate, threshold enforced mechanically
 RP check mutation --min 80 -- <mutcmd>      # block-gate stage: survives test-only edits
 RP check property -- <cmd with --hypothesis-seed=N>   # refuses to run unseeded

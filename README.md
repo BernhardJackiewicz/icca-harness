@@ -419,6 +419,8 @@ repository:
 ```
 RP check static -- sh -c "ruff check bin/ bench/*.py && xenon --max-absolute C bin/"
 RP check quality -- sh -c "xenon --max-absolute C --max-modules B --max-average A bin/ && python3 -c \"import pathlib, sys; big = [str(p) for p in pathlib.Path('bin').rglob('*.py') if len(p.read_text().splitlines()) > 1200]; sys.exit(1 if big else print('module sizes ok'))\""
+RP check deps -- sh -c "python3 tools/deps_check.py --policy deps-policy.json"
+RP check e2e -- sh -c "python3 tools/run_scenarios.py --config e2e-scenarios.json"
 RP check coverage --min 40 -- sh -c "python3 -m coverage run -m pytest -q tests/ && python3 -m coverage report --include='bin/red_proof.py'"
 RP check mutation --min 80 -- sh -c "mutmut run && mutmut results"
 RP check property -- python3 -m pytest -q tests/ --hypothesis-seed=1234
@@ -443,6 +445,19 @@ check without an extractor. The ceilings above are this repository's
 honest current numbers: the worst block in `bin/` ranks C, the module
 average ranks A, and the only module under `bin/` is 1072 lines against
 the 1200-line cap.
+
+`deps` and `e2e` are the two newest opt-in gates, and both are built
+but unmeasured: they are not part of the benchmark yet and their value
+hypotheses are deliberately not registered, so nothing here claims that
+either stage pays for itself. `deps` checks the import graph of
+first-party code against a declared policy: no cycles, and only the
+layering the policy allows. `e2e` drives the built artifact through its
+declared entry point, so the wired whole is exercised rather than its
+units. Both are exit-code gates on purpose: a violation count has no
+floor semantics, and a half-passing scenario run is a failed run, so
+there is no number for `--min` to grade. The commands above are the
+shape a project declares; the CLI runs what it is given and the
+checking itself lives in the project's own tools.
 
 Thresholds are set per contract, not globally: a cheap gate runs on
 every declaring commit, an expensive one only on block-closing

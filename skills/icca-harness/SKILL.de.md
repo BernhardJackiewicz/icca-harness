@@ -276,6 +276,8 @@ RP check targeted -- <testcmd>
 RP check full-suite -- <suitecmd>
 RP check static -- <lintcmd>                # Exit-Code-Gate, ausgeführt vom Checker-Agenten
 RP check quality -- <Ceilings-Kommando>     # Exit-Code-Gate: Komplexitäts- und Größenobergrenzen
+RP check deps -- <Import-Graph-Kommando>    # Exit-Code-Gate: Zyklen und Schichtung
+RP check e2e -- <Szenario-Kommando>         # Exit-Code-Gate: das verdrahtete Artefakt Ende zu Ende
 RP check coverage --min 90 -- <covcmd>      # Metrik-Gate, Schwelle mechanisch erzwungen
 RP check mutation --min 80 -- <mutcmd>      # Block-Gate-Stufe: überlebt reine Test-Edits
 RP check property -- <cmd mit --hypothesis-seed=N>   # läuft nicht ohne fixierten Seed
