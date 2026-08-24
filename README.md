@@ -548,8 +548,14 @@ Not measured, stated as such:
   packages; one brownfield fixture (a working multi-module package
   with a feature ask) exists as measurement surface and has not been
   measured on.
-- **Dependency-structure and end-to-end stages.** Design documents
-  only.
+- **Dependency-structure and end-to-end stages.** Built and tested,
+  not measured: both exist as opt-in CLI gates and as full bench
+  stages in the development benchmark (runners, arms, observing
+  after-measures with preregistered start criteria, held-in and
+  held-out fixtures with reference and witness overlays). No model
+  has run against them and no hypothesis is registered; until the
+  after-measures justify a measurement, they are mechanisms, not
+  claims.
 - **Field causality.** A descriptive field report can count cycles,
   gate runs and findings; whether the workflow reduces regressions in
   real work has no comparison arm and therefore no number. A
