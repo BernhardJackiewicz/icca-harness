@@ -27,53 +27,6 @@ The first effect is measured. The second is mechanically enforced in the places 
 
 ---
 
-## What the measurement actually says
-
-On the larger, implementation-heavy benchmark task:
-
-| Measure                           |     Inline |  Delegated |   Change |
-| --------------------------------- | ---------: | ---------: | -------: |
-| **Expensive-model tokens, total** | **16,576** | **11,864** | **-28%** |
-| Context re-sent                   |     14,596 |     10,607 |     -27% |
-| Output including thinking         |      1,981 |      1,258 |     -37% |
-| Peak context, single request      |      4,136 |      3,706 |     -10% |
-| **Tokens across both models**     | **16,576** | **22,632** | **+37%** |
-| Success                           |        4/4 |        4/4 |    equal |
-
-The same expensive-model allowance therefore lasts about **40% longer**:
-
-`16,576 / 11,864 ≈ 1.40`
-
-That does **not** mean the workflow uses fewer tokens overall. It does not.
-
-Delegation moves volume away from the scarce model and onto the implementer model, while adding briefing and cold-start overhead.
-
-On the small task, that overhead dominates:
-
-| Measure                           |    Inline |  Delegated |    Change |
-| --------------------------------- | --------: | ---------: | --------: |
-| **Expensive-model tokens, total** | **6,934** |  **7,407** |   **+7%** |
-| Context re-sent                   |     6,126 |      6,636 |       +8% |
-| Peak context, single request      |     2,016 |      2,202 |       +9% |
-| **Tokens across both models**     | **6,934** | **15,201** | **+119%** |
-| Success                           |       4/4 |        4/4 |     equal |
-
-So the measured rule is not “delegate everything.”
-
-It is:
-
-> **Delegate implementation-heavy work when the strongest model is the scarce resource. Do small, well-scoped work directly.**
-
-Three limits belong next to the headline rather than in a footnote:
-
-* **Total token consumption goes up.** On the large task it rose 37% across both models.
-* **Delegation loses on small tasks.** The small benchmark used 7% more expensive-model tokens and 119% more total tokens.
-* **The measurement is narrow.** It comes from small synthetic repositories, with contexts under 5,000 tokens, roughly five tool calls per run, not a large production codebase. The README also characterizes this scale as roughly $0.22 per run; the reproduced 16-run benchmark below reports $2.55 total across all runs.
-
-Only the **28% reduction on the expensive model for the measured implementation-heavy task** is evidence for the headline. Everything beyond that is either mechanism, interpretation, or an explicitly untested hypothesis.
-
----
-
 ## The workflow at a glance
 
 ```text
@@ -143,6 +96,53 @@ Only the **28% reduction on the expensive model for the measured implementation-
   |     never sees an "all done" summary                            |
   +-----------------------------------------------------------------+
 ```
+
+---
+
+## What the measurement actually says
+
+On the larger, implementation-heavy benchmark task:
+
+| Measure                           |     Inline |  Delegated |   Change |
+| --------------------------------- | ---------: | ---------: | -------: |
+| **Expensive-model tokens, total** | **16,576** | **11,864** | **-28%** |
+| Context re-sent                   |     14,596 |     10,607 |     -27% |
+| Output including thinking         |      1,981 |      1,258 |     -37% |
+| Peak context, single request      |      4,136 |      3,706 |     -10% |
+| **Tokens across both models**     | **16,576** | **22,632** | **+37%** |
+| Success                           |        4/4 |        4/4 |    equal |
+
+The same expensive-model allowance therefore lasts about **40% longer**:
+
+`16,576 / 11,864 ≈ 1.40`
+
+That does **not** mean the workflow uses fewer tokens overall. It does not.
+
+Delegation moves volume away from the scarce model and onto the implementer model, while adding briefing and cold-start overhead.
+
+On the small task, that overhead dominates:
+
+| Measure                           |    Inline |  Delegated |    Change |
+| --------------------------------- | --------: | ---------: | --------: |
+| **Expensive-model tokens, total** | **6,934** |  **7,407** |   **+7%** |
+| Context re-sent                   |     6,126 |      6,636 |       +8% |
+| Peak context, single request      |     2,016 |      2,202 |       +9% |
+| **Tokens across both models**     | **6,934** | **15,201** | **+119%** |
+| Success                           |       4/4 |        4/4 |     equal |
+
+So the measured rule is not “delegate everything.”
+
+It is:
+
+> **Delegate implementation-heavy work when the strongest model is the scarce resource. Do small, well-scoped work directly.**
+
+Three limits belong next to the headline rather than in a footnote:
+
+* **Total token consumption goes up.** On the large task it rose 37% across both models.
+* **Delegation loses on small tasks.** The small benchmark used 7% more expensive-model tokens and 119% more total tokens.
+* **The measurement is narrow.** It comes from small synthetic repositories, with contexts under 5,000 tokens, roughly five tool calls per run, not a large production codebase. The README also characterizes this scale as roughly $0.22 per run; the reproduced 16-run benchmark below reports $2.55 total across all runs.
+
+Only the **28% reduction on the expensive model for the measured implementation-heavy task** is evidence for the headline. Everything beyond that is either mechanism, interpretation, or an explicitly untested hypothesis.
 
 ---
 
