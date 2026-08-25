@@ -6,224 +6,378 @@
 ![license](https://img.shields.io/badge/license-MIT-green)
 ![dependencies](https://img.shields.io/badge/dependencies-stdlib%20only-lightgrey)
 
-**Get about 40% more out of an expensive-model subscription: on
-implementation-heavy work this workflow spends 28% fewer tokens on the
-expensive model, at an identical success rate.** The orchestrator's
-context holds decisions; the volume (implementation, search, test output,
-audit) runs in delegated or fresh contexts.
+**Get about 40% more out of an expensive-model subscription: on implementation-heavy work this workflow spends 28% fewer tokens on the expensive model, at an identical success rate.** The orchestrator's context holds decisions; the volume (implementation, search, test output, audit) runs in delegated or fresh contexts.
 
-ICCA names the four separated roles that carry the method: Implementer,
-Checker, Control, Auditor. The harness is the machinery around them, not
-an agent itself.
+ICCA is an evidence-gated maker-checker-auditor workflow for agentic development. The name comes from the four separated roles that carry the method:
 
-```
+**Implementer · Checker · Control · Auditor**
+
+The harness is the machinery around those roles, not an agent itself.
+
+The central rule is simple:
+
+> **The agent that implements never decides whether its own implementation is accepted.**
+
+That separation does two things at once:
+
+1. it keeps high-volume implementation work out of the scarce orchestrator context;
+2. it makes delegation safe enough to use by binding acceptance evidence to the exact code state that was verified.
+
+The first effect is measured. The second is mechanically enforced in the places where a script can enforce it, and explicitly model-attested where it cannot.
+
+---
+
+## What the measurement actually says
+
+On the larger, implementation-heavy benchmark task:
+
+| Measure                           |     Inline |  Delegated |   Change |
+| --------------------------------- | ---------: | ---------: | -------: |
+| **Expensive-model tokens, total** | **16,576** | **11,864** | **-28%** |
+| Context re-sent                   |     14,596 |     10,607 |     -27% |
+| Output including thinking         |      1,981 |      1,258 |     -37% |
+| Peak context, single request      |      4,136 |      3,706 |     -10% |
+| **Tokens across both models**     | **16,576** | **22,632** | **+37%** |
+| Success                           |        4/4 |        4/4 |    equal |
+
+The same expensive-model allowance therefore lasts about **40% longer**:
+
+`16,576 / 11,864 ≈ 1.40`
+
+That does **not** mean the workflow uses fewer tokens overall. It does not.
+
+Delegation moves volume away from the scarce model and onto the implementer model, while adding briefing and cold-start overhead.
+
+On the small task, that overhead dominates:
+
+| Measure                           |    Inline |  Delegated |    Change |
+| --------------------------------- | --------: | ---------: | --------: |
+| **Expensive-model tokens, total** | **6,934** |  **7,407** |   **+7%** |
+| Context re-sent                   |     6,126 |      6,636 |       +8% |
+| Peak context, single request      |     2,016 |      2,202 |       +9% |
+| **Tokens across both models**     | **6,934** | **15,201** | **+119%** |
+| Success                           |       4/4 |        4/4 |     equal |
+
+So the measured rule is not “delegate everything.”
+
+It is:
+
+> **Delegate implementation-heavy work when the strongest model is the scarce resource. Do small, well-scoped work directly.**
+
+Three limits belong next to the headline rather than in a footnote:
+
+* **Total token consumption goes up.** On the large task it rose 37% across both models.
+* **Delegation loses on small tasks.** The small benchmark used 7% more expensive-model tokens and 119% more total tokens.
+* **The measurement is narrow.** It comes from small synthetic repositories, with contexts under 5,000 tokens, roughly five tool calls per run, not a large production codebase. The README also characterizes this scale as roughly $0.22 per run; the reproduced 16-run benchmark below reports $2.55 total across all runs.
+
+Only the **28% reduction on the expensive model for the measured implementation-heavy task** is evidence for the headline. Everything beyond that is either mechanism, interpretation, or an explicitly untested hypothesis.
+
+---
+
+## The workflow at a glance
+
+```text
                               the task
                                  |
                                  v
-               Part 0 self-triage: solo | light | full
-              (no harness / plain cycle / cycle + gates)
+                Part 0 self-triage: solo | light | full
+               (no harness / plain cycle / cycle + gates)
                                  |
                                  v
- +-----------------------------------------------------------------+
- |  ORCHESTRATOR                                                   |
- |  commit contract with requirement provenance; acceptance tests  |
- |  written FIRST and proven red (behavior red, contract red, or   |
- |  gherkin scenario red), then frozen by patch fingerprint so     |
- |  nobody can weaken them later                                   |
- +--------------------------------+--------------------------------+
-                                  | delegate, fresh context
-                                  v
- +-----------------------------------------------------------------+
- |  I  IMPLEMENTER                                                 |
- |     the only role that writes production code, surrounded by    |
- |     the constraints: never stages, never commits, cannot touch  |
- |     the frozen tests, never accepts its own work                |
- +--------------------------------+--------------------------------+
-                                  |
-                the gauntlet: each gate opt-in per contract
-                                  |
- +--------------------------------v--------------------------------+
- |  C  CHECKER agents: one fresh context per gate, never repair,   |
- |     never see the implementer's transcript                      |
- |                                                                 |
- |     unit tests + coverage floor      static analysis            |
- |     quality metrics (ceilings)       mutation testing           |
- |     property tests (seed-pinned)     dependency structure       |
- |     e2e scenarios: QA procedures driving the wired artifact     |
- +--------------------------------+--------------------------------+
-                                  |
-      a finding becomes a defect contract and goes back to I
-      (at most two repairs per defect, then re-planning)
-                                  |
-                                  v
- +-----------------------------------------------------------------+
- |  C  CONTROL agent (optional, larger plans): checks the          |
- |     finished cycle against its contract, fresh context          |
- +--------------------------------+--------------------------------+
-                                  v
-       commit gate: every piece of evidence is bound to the exact
-       code state by fingerprint; one gate, exactly one commit
-                                  |
-                                  v
- +-----------------------------------------------------------------+
- |  A  AUDITOR: fresh context, interprets the original             |
- |     requirements itself, runs the tests and builds its own      |
- |     probes, never sees an "all done" summary                    |
- +-----------------------------------------------------------------+
+  +-----------------------------------------------------------------+
+  |  ORCHESTRATOR                                                   |
+  |  commit contract with requirement provenance; acceptance tests  |
+  |  written FIRST and proven red (behavior red, contract red, or   |
+  |  scenario red), then frozen by patch fingerprint so nobody can  |
+  |  weaken them later                                              |
+  +--------------------------------+--------------------------------+
+                                   |
+                         delegate, fresh context
+                                   v
+  +-----------------------------------------------------------------+
+  |  I  IMPLEMENTER                                                 |
+  |     the only role that writes production code                   |
+  |                                                                 |
+  |     never stages                                                |
+  |     never commits                                               |
+  |     cannot touch frozen tests                                   |
+  |     never accepts its own work                                  |
+  +--------------------------------+--------------------------------+
+                                   |
+                  the gauntlet: gates declared per contract
+                                   |
+                                   v
+  +-----------------------------------------------------------------+
+  |  C  CHECKER agents                                              |
+  |     one fresh context per gate                                  |
+  |     never see the implementer's transcript                      |
+  |     never repair                                                |
+  |                                                                 |
+  |     unit tests + coverage        static analysis                |
+  |     quality ceilings             mutation testing               |
+  |     property tests               dependency structure           |
+  |     e2e scenarios                                               |
+  +--------------------------------+--------------------------------+
+                                   |
+          finding -> defect contract -> back to Implementer
+          at most two repairs per defect, then re-planning
+                                   |
+                                   v
+  +-----------------------------------------------------------------+
+  |  C  CONTROL agent                                               |
+  |     optional on larger plans                                    |
+  |     checks the completed cycle against its contract             |
+  |     fresh context                                               |
+  +--------------------------------+--------------------------------+
+                                   |
+                                   v
+         commit gate: evidence is fingerprint-bound to the exact
+               code state; one gate, exactly one commit
+                                   |
+                                   v
+  +-----------------------------------------------------------------+
+  |  A  AUDITOR                                                     |
+  |     fresh context                                               |
+  |     interprets the original requirements independently         |
+  |     runs tests and builds its own probes                        |
+  |     never sees an "all done" summary                            |
+  +-----------------------------------------------------------------+
 ```
 
-Measured over 16 paired runs, not estimated: cost is read from the `usage`
-field of every response and the raw per-run data ships in this repository.
+---
 
-Three things that number does not say, stated here rather than in a
-footnote, because they decide whether it is worth anything to you:
+## Credits
 
-- **It spends more tokens overall, not fewer.** Delegation moves work to
-  the cheaper model rather than removing it, and it adds a briefing and a
-  cold start: across both models the large task used 37% *more* tokens.
-  It is a win when the strongest model is the scarce resource, which is
-  the normal case on a subscription, and a loss when you are counting
-  every token you buy.
-- **It costs more on small tasks.** On a one-module fix the same
-  measurement shows 7% more tokens on the expensive model and 119% more
-  across both. The break-even is real and it is documented below.
-- **It was measured on small synthetic repositories**, at roughly 5 tool
-  calls and $0.22 per run. Nothing here has been measured at the scale of
-  a large production codebase.
+This repository exists because of one tweet:
 
-Doing that safely needs one thing: if the strongest model is not reading
-every line the implementer wrote, something other than trust has to
-verify the result. So this ships with an evidence-gated commit cycle
-that a hook actually enforces, called red-proof.
+> I’m significantly older than you. I started coding in the late 60s. My
+> current strategy is to not read any of the code written by my agents.
+> That’s the only way I can take advantage of their productivity. What I
+> do instead is to surround the agents with extreme constraints. Unit
+> tests, gherkin tests, QA procedures, quality metrics, mutation
+> testing, test coverage, and a plethora of others. In the end, I have
+> very high confidence in the code they produce because they’ve had to
+> run the gauntlet of all of my constraints and tests.
+>
+> [Uncle Bob Martin, @unclebobmartin, July 23, 2026](https://x.com/unclebobmartin/status/2080257779395154409)
+
+Robert Cecil Martin (Uncle Bob), author of *Clean Code* and of the
+[Agentic Manifesto](https://www.agenticmanifesto.org/), described the
+gauntlet. This repository builds that gauntlet as enforceable machinery
+(the gates above: unit tests, gherkin scenario reds, QA procedures as
+e2e scenarios, quality metrics, mutation testing, coverage, dependency
+structure) and then does the part the tweet leaves open: it measures,
+gate by gate against hidden test suites, which parts of the gauntlet
+earn their keep. One deliberate divergence is documented in the
+evidence section below: here the orchestrator still reads every diff,
+because the measured value window of the gates alone turned out to be
+narrow.
+
+---
 
 ## Why the context window is the scarce resource
 
-The strongest model in a subscription is also the one you run out of
-first. And the default agentic loop spends it in the worst possible way:
-one model does everything in one context that only ever grows.
+The strongest model in a subscription is usually also the one whose allowance you exhaust first.
 
-Look at where the tokens actually go in a single feature. Locating the
-right code, reading files that turn out to be irrelevant, three failed
-attempts at a fix, the full output of a test suite, then a summary of
-all of it so the next round still has the thread. That is tens of
-thousands of tokens of tool output feeding a decision that is worth a
-few hundred. Every one of them sits in the expensive window, and every
-one of them is re-sent with the next request.
+A default agentic loop spends that resource inefficiently: one model searches, reads, implements, retries, runs tests, consumes test output, summarizes its own previous work, and carries all of that history into the next turn.
 
-The fix is not a shorter prompt. It is putting the volume somewhere
-else.
+Consider a single feature:
 
-## How the tokens are saved
+* locating the relevant code,
+* opening files that turn out not to matter,
+* failed implementation attempts,
+* repeated test output,
+* repair iterations,
+* and summaries whose only purpose is preserving state for the next turn.
 
-1. **Implementation is delegated.** Production code is written by an
-   Opus subagent in its own fresh context. Search runs, dead ends, file
-   reads and test output land there, not in the orchestrator's window.
-   The orchestrator receives a compact structured return: changed files,
-   criteria met, decisions, risks. This is by far the largest effect.
-2. **Contract handoffs instead of carried history.** Each delegation is
-   a small self-contained commit contract. The codebase is not
-   re-explained every round, and the orchestrator does not have to hold
-   the implementation details of previous rounds to stay coherent.
-3. **Index navigation instead of file dumps.** A code-intelligence index
-   answers "where is this" and "what calls this" with targeted snippets,
-   so full files are read only for the hunks that actually get reviewed.
-4. **An evidence ledger instead of reconstruction.** Each commit leaves a
-   compact structured record: contract hash, red proof, frozen test
-   hash, test results, fingerprints. Later audits navigate that instead
-   of re-reading old agent transcripts, which is the single most
-   expensive way to remember something.
-5. **Bounded repair loops.** At most two repairs per defect, then
-   re-plan. An unbounded fix loop is the worst token sink in agentic
-   development, because its context grows with every failed attempt and
-   its chance of success falls at the same time.
-6. **A fresh audit context.** Final acceptance runs in its own agent. It
-   costs nothing from the main window and it is less anchored, since it
-   never sees the "all done" summaries.
-7. **Process state on disk.** Phases, fingerprints and evidence live in
-   files. The orchestrator never has to hold or repeat them, and a
-   compaction cannot lose them.
+That can consume tens of thousands of tokens to support a decision whose durable information may fit in a few hundred.
 
-Those are the mechanisms. What they are actually worth was measured, and
-the answer is smaller than the list makes it sound. See the next section.
+Worse, the accumulated context is re-sent on later requests.
 
-## What it is worth, measured
+The fix is not merely a shorter prompt.
 
-The headline: on implementation-heavy work the delegated cycle spends
-**28% fewer tokens on the expensive model**, at the same success rate.
-Read as reach, the same measurement says the expensive model's budget
-lasts **about 40% longer**. On a small, well-scoped fix it is slightly
-worse than doing the work inline. And the total number of tokens goes up,
-not down: delegation moves work to the cheaper model rather than removing
-it.
+**The fix is to put the volume somewhere else while keeping decisions and contracts in the orchestrator.**
 
-Everything below is counted in tokens. Dollars are left out on purpose:
-they depend on which models you pair and on cache pricing, and they made
-a token claim look like a cost claim.
+---
 
-### Setup
+## How the expensive-model tokens are reduced
 
-Two arms run the same task with the same tools, the same effort level and
-the same turn cap. The only difference is whether implementation is
-delegated to a subagent. Success is a passing test suite, so a cheap
-failure cannot be counted as a saving. Orchestrator: Claude Fable 5.
-Implementer: Claude Opus 5. Effort `medium`. 16 runs, 4 per cell, all 16
-successful, no cost-gate aborts. Cost is computed from the `usage` field
-of every single response, not estimated.
+### 1. Delegate implementation
 
-Two tasks of the same kind and different size, chosen to sit on either
-side of the break-even point:
+Production code is written by an Opus subagent in its own fresh context.
 
-- **small** (`duration`): write one new module against 11 failing tests.
-- **large** (`feature`): write three new modules against 27 failing tests.
+Search runs, dead ends, file reads, implementation attempts and test output stay there rather than accumulating in the orchestrator window.
 
-### Results
+The orchestrator receives a compact structured return:
 
-Large task, mean of 4 runs per arm:
+* changed files,
+* criteria met,
+* decisions,
+* risks.
 
-| Measure (tokens) | inline | delegated | change |
-|---|---|---|---|
-| **on the expensive model, total** | **16,576** | **11,864** | **-28%** |
-| of that, context re-sent | 14,596 | 10,607 | -27% |
-| of that, output including thinking | 1,981 | 1,258 | -37% |
-| context peak, single request | 4,136 | 3,706 | -10% |
-| across both models | 16,576 | 22,632 | **+37%** |
-| success | 4/4 | 4/4 | equal |
+This is the largest measured mechanism.
 
-The ranges do not overlap on the headline measure, so the effect is not
-noise. Note the last two rows together: the expensive model does 28% less
-work, and the system as a whole does 37% more, because the implementer
-starts cold and has to be briefed.
+### 2. Hand off contracts, not conversation history
 
-Small task, mean of 4 runs per arm:
+Each delegation receives a small, self-contained commit contract.
 
-| Measure (tokens) | inline | delegated | change |
-|---|---|---|---|
-| **on the expensive model, total** | **6,934** | **7,407** | **+7%** |
-| of that, context re-sent | 6,126 | 6,636 | +8% |
-| context peak, single request | 2,016 | 2,202 | +9% |
-| across both models | 6,934 | 15,201 | **+119%** |
-| success | 4/4 | 4/4 | equal |
+The codebase does not need to be re-explained every round, and the orchestrator does not need to retain every implementation detail from earlier rounds in order to remain coherent.
 
-Here delegation is simply worse, and the ranges are separated on that
-too, so it is not noise either. The orchestrator still has to understand
-the problem well enough to brief and to verify, so the briefing round
-trip and the implementer's cold start are pure overhead. This matches the
-skill's own rule: do not delegate work you could finish in a handful of
-tool calls.
+### 3. Navigate by index instead of dumping files
 
-### Two things this does not say
+A code-intelligence index answers questions such as:
 
-**It does not say the workflow uses fewer tokens.** It uses more: 37%
-more on the large task, 119% more on the small one. What drops is the
-share carried by the expensive model. Read "saves" as "saves the scarce
-allowance", never as "saves total consumption".
+* where is this defined?
+* what calls this?
+* which files are relevant?
 
-**It does not extrapolate.** The measured mechanism scales with the
-number of implementer turns, and in these tasks that was three, so this
-sits at the low end of where the effect exists at all. Whether it grows
-with longer implementations is untested here. Only the 28% is evidence.
+That lets the workflow read targeted snippets and inspect complete files only when review requires them.
 
-### Reproducing it
+### 4. Persist evidence instead of reconstructing history
+
+Each commit leaves a compact structured record containing things such as:
+
+* contract hash,
+* red proof,
+* frozen-test hash,
+* test results,
+* content fingerprints.
+
+Later review can navigate this ledger instead of reconstructing state from old agent transcripts.
+
+### 5. Bound repair loops
+
+A defect gets at most two repair attempts before the workflow returns to planning.
+
+Unbounded patch loops are expensive because every failure adds context while the probability that another blind patch succeeds may be falling.
+
+### 6. Audit in a fresh context
+
+Final acceptance runs in a separate agent context.
+
+That keeps audit volume out of the orchestrator window and reduces anchoring because the auditor never receives previous “all done” summaries.
+
+### 7. Keep process state on disk
+
+Phases, fingerprints and evidence live in files.
+
+The orchestrator does not need to continuously hold or restate that state, and context compaction cannot silently erase it.
+
+---
+
+# Evidence
+
+## Benchmark setup
+
+The headline measurement comes from **16 paired runs**, not an estimate.
+
+Two arms run the same task with:
+
+* the same tools,
+* the same effort level,
+* the same turn cap.
+
+The only experimental difference is whether implementation happens inline or is delegated to a subagent.
+
+**Orchestrator:** Claude Fable 5
+**Implementer:** Claude Opus 5
+**Effort:** `medium`
+**Runs:** 16 total, 4 per cell
+**Success:** all 16 runs successful
+**Cost-gate aborts:** none
+
+Success means the test suite passes, so a cheap failed run cannot count as a saving.
+
+Token and cost data are read from the `usage` field of every response rather than inferred from text length.
+
+The two tasks have the same general shape but different sizes:
+
+* **small (`duration`)**: one new module against 11 failing tests;
+* **large (`feature`)**: three new modules against 27 failing tests.
+
+They were chosen to fall on opposite sides of delegation's break-even point.
+
+Everything in the headline tables is expressed in **tokens**, not dollars. Dollar figures are deliberately not used for the token comparison because model pairing, output weighting and cache pricing can make a cost ratio look like a token ratio when they are not the same thing.
+
+---
+
+## Large task
+
+Mean of four runs per arm:
+
+| Measure                      |     Inline |  Delegated |   Change |
+| ---------------------------- | ---------: | ---------: | -------: |
+| **Expensive model, total**   | **16,576** | **11,864** | **-28%** |
+| Context re-sent              |     14,596 |     10,607 |     -27% |
+| Output including thinking    |      1,981 |      1,258 |     -37% |
+| Context peak, single request |      4,136 |      3,706 |     -10% |
+| **Across both models**       | **16,576** | **22,632** | **+37%** |
+| Success                      |        4/4 |        4/4 |    equal |
+
+The ranges do not overlap on the headline measure, so the measured difference is not explained by overlap between the observed ranges.
+
+The two bold token rows matter together:
+
+**the expensive model did 28% less work, while the system as a whole did 37% more.**
+
+The additional total consumption comes from moving implementation into a second context that starts cold and must first be briefed.
+
+---
+
+## Small task
+
+Mean of four runs per arm:
+
+| Measure                      |    Inline |  Delegated |    Change |
+| ---------------------------- | --------: | ---------: | --------: |
+| **Expensive model, total**   | **6,934** |  **7,407** |   **+7%** |
+| Context re-sent              |     6,126 |      6,636 |       +8% |
+| Context peak, single request |     2,016 |      2,202 |       +9% |
+| **Across both models**       | **6,934** | **15,201** | **+119%** |
+| Success                      |       4/4 |        4/4 |     equal |
+
+Here delegation is simply worse.
+
+The observed ranges are separated here too.
+
+The orchestrator still has to understand the problem well enough to specify and verify it, but delegation adds an implementer cold start and a briefing round trip. For work that can already be completed in a handful of tool calls, those costs are pure overhead.
+
+That is why the workflow begins with self-triage instead of requiring delegation universally.
+
+---
+
+## What these results do not say
+
+### They do not say the workflow uses fewer tokens
+
+It uses more total tokens:
+
+* **+37%** on the large task;
+* **+119%** on the small task.
+
+What drops in the successful large-task case is the amount carried by the expensive model.
+
+Read “saves” as:
+
+> **saves scarce expensive-model allowance**
+
+not:
+
+> **reduces total token consumption**
+
+### They do not establish scaling behavior
+
+The measured mechanism should depend on the amount of implementation work that can be moved out of the orchestrator context.
+
+In these benchmark tasks the implementer used three turns, placing the experiment near the low end of where such an effect can appear at all.
+
+Whether the advantage increases on substantially longer implementations is untested.
+
+**Only the measured 28% is evidence.**
+
+---
+
+## Reproduce the benchmark
 
 ```bash
 pip install anthropic
@@ -231,159 +385,353 @@ export ANTHROPIC_API_KEY=...          # billed per token, no subscription credit
 python3 bench/bench.py feature duration
 ```
 
-All 16 runs cost $2.55 in total. The harness gates spend hard: it aborts
-a single run at `PER_RUN_CAP` and the whole benchmark at `GLOBAL_CAP`, so
-a runaway agent cannot empty the account. Raw per-run data, including
-token counts and cost per model, is in `bench/results.json`; the method
-and its limits are in `bench/README.md`.
+The 16 recorded runs cost **$2.55 total**.
 
-## What you get on top: verification that does not depend on trust
+The harness hard-limits spend:
 
-Delegating implementation only works if acceptance is real. Agentic
-coding tools fail in a specific, repeatable way: the agent that writes
-the code is also the agent that decides whether the code is acceptable.
-Under that arrangement the cheapest path to "done" is not always to make
-the code correct.
+* `PER_RUN_CAP` aborts an individual runaway run;
+* `GLOBAL_CAP` aborts the benchmark as a whole.
 
-- a test gets weakened, skipped, or its expectation rewritten,
-- a test is red because of a broken import, the implementation fixes the
-  import, and the actual behavior is never verified,
-- the full suite passes, two more lines get changed, and the commit
-  ships against a code state that was never tested,
-- a repair loop runs forever because nobody decided when to stop
-  patching and start re-planning,
-- the final report says "all requirements met" because the tests are
-  green, which only proves conformance with the tests.
+Raw per-run model usage, token counts and costs live in:
 
-Three roles remove the incentive structurally:
+```text
+bench/results.json
+```
 
-| Role | Owns |
-|---|---|
-| Orchestrator | requirements, commit contracts, acceptance tests, red proof, review, verification, staging, commits |
-| Implementer (Opus subagent) | production code and repairs, nothing else |
-| Checker agents (one fresh context per gate) | running the declared stage gates themselves; they never see implementer transcripts and never repair |
-| Control agent (optional, larger plans) | reviewing a finished cycle against its contract before the block audit |
-| Auditor (fresh context) | independent requirement-first completeness acceptance |
+The experimental method and its limitations are documented in:
 
-The rule that carries the whole thing: the agent that implements never
-decides whether its own implementation is accepted.
+```text
+bench/README.md
+```
 
-### The cycle per commit
+---
 
-1. **Commit contract.** Small enough to stay atomic, independently
-   checkable and revertible. Every acceptance criterion is traced back
-   to its origin, so no criterion can be back-derived from code that
-   already exists.
-2. **Red phase, before any implementation.** The orchestrator writes the
-   binding acceptance tests and proves they fail for the right reason.
-   Three kinds of red are legitimate: *behavior red* for an interface
-   that already exists, *contract red* for a symbol the contract
-   deliberately introduces, where `ModuleNotFoundError` is the expected
-   proof rather than a setup error, and *scenario red* for acceptance
-   criteria written as Gherkin scenarios, where a failing step or a
-   missing step definition is the proof and the `.feature` file is
-   frozen together with its step skeletons as specification, not
-   production code. Syntax errors, wrong import paths
-   and broken fixtures are never valid red. This is why the orchestrator
-   never has to write a production stub.
-3. **Mechanical freeze.** The acceptance tests are staged and
-   fingerprinted. Only the orchestrator touches the git index. A
-   modified frozen test is detected by hash, not by someone noticing.
-4. **Delegated implementation.** The subagent gets the contract, the
-   provenance, the red proof, the expected change surface and the
-   explicit non-goals.
-5. **Verification gate.** Freeze check first, because a violation makes
-   all further review worthless. Then targeted tests, a direct read of
-   every changed hunk, a per-criterion proof, and a scope review.
-6. **Bounded repair.** A precise defect contract goes back to the
-   implementer. The full suite is not required on every iteration unless
-   the repair touches shared core code, public interfaces, persistence,
-   audit behavior, security boundaries or idempotency. After two failed
-   repairs the commit goes back to planning instead of being patched
-   again.
-7. **Commit gate.** Full suite, complete diff reviewed, contract met, no
-   scope creep, atomic and revertible. Then the commit.
-8. **Requirement-first audit.** In a fresh context, without repair
-   justifications or previous summaries. The auditor interprets the
-   original requirements independently, runs the tests and demos itself,
-   and grades each requirement as met and proven, partially met, not
-   met, or not provable.
+# Why delegation needs independent verification
 
-A green test run is necessary and not sufficient. The final claim is
-never "the feature is correct" but "the feature demonstrably matches the
-specified requirements, to the extent audit and verification cover
-them".
+Moving implementation out of the orchestrator context creates a trust problem.
 
-## The whole harness on one page
+If the strongest model no longer reads every line while it is being written, the workflow needs another way to establish whether the returned result is acceptable.
 
-Bottom line up front: this is a mechanically enforced
-maker-checker-auditor workflow around every commit, with a recorded
-self-triage in front of it. No model accepts its own work, and every
-piece of evidence is bound to the exact code state instead of being
-asserted. Everything below exists today; which parts have measured
-value is stated further down, honestly.
+Agentic coding also has a structural failure mode: the same agent often writes the implementation and then decides whether the implementation is good enough.
 
-**Decision layer**
-1. Self-triage (Part 0 of the skill): solo, light or full, decided by
-   the agent itself, always logged, overridable with a word.
+That arrangement creates shortcuts to “done” that are cheaper than actually satisfying the requirement:
 
-**Specification layer**
-2. Commit contracts with requirement provenance, so no acceptance
-   criterion can be back-derived from code that already exists.
-3. Red proof with three red kinds: behavior red, contract red, and
-   scenario red (Gherkin feature files as frozen specification with
-   step skeletons). The CLI refuses to record a red that exited 0.
-4. Mechanical freeze of the acceptance tests by patch fingerprint,
-   with a lint pass over the files before they freeze.
+* a test can be weakened, skipped or rewritten;
+* a red test may be caused by a broken import, the import gets fixed, and the intended behavior is never demonstrated;
+* the full suite can pass, followed by two untested edits before commit;
+* a repair loop can continue indefinitely because no one decides when to stop patching;
+* a final report can claim “all requirements met” merely because the tests are green, even though the tests may not cover the complete requirement.
 
-**Role separation**
-5. The implementer (a delegated subagent in a fresh context) writes
-   production code and nothing else: never stages, never commits,
-   never touches frozen tests.
-6. Checker agents, one fresh context per declared gate, run their
-   check themselves and never repair.
-7. A control agent on larger plans, and a requirement-first auditor in
-   a fresh context that interprets the original requirements itself
-   and never sees "all done" summaries.
+ICCA separates those incentives structurally.
 
-**Stage gates, opt-in per contract**
-8. Static analysis, quality ceilings (complexity and module size,
-   built but unmeasured) and coverage with a mechanical threshold.
-9. A mutation gate (kill-rate floor, evidence survives test-only
-   edits) and a seed-enforced property gate. Both measured: each
-   converts an occasional blind spot, neither earned its cost, so
-   they belong on block-closing contracts of critical code only.
-9b. A dependency-structure gate (import-graph cycles and layering
-    against a declared policy) and an end-to-end scenario gate (the
-    wired artifact driven through its declared entry point). Both
-    built and tested, neither measured; their hypotheses are
-    deliberately not yet registered.
+---
 
-**Mechanical enforcement**
-10. Hooks deny production edits without an active cycle or logged
-    exemption, and `git commit` without a passed gate.
-11. A content fingerprint binds all evidence to HEAD plus file
-    contents: one edited line after verification invalidates the
-    gate. One gate, exactly one commit.
-12. A snapshot guard and bounded repair loops: two repairs per
-    defect, then re-planning instead of an endless patch loop.
-13. An evidence ledger entry per commit.
+## Roles
 
-**The science layer behind the claims**
-14. The numbers in this README come from a development benchmark:
-    paired runs against hidden test suites the agent never sees, with
-    reference and witness implementations proving each fixture can
-    separate right from plausibly wrong, and decision rules registered
-    before the first run.
-15. The workflow improves itself only through a refinement loop of
-    typed, judged, rollbackable proposals, in which a proposal that
-    loosens any gate cannot even enter the ledger without declaring a
-    measurement obligation. The loop's first round is on record,
-    including one proposal its own judge rejected.
+| Role               | Owns                                                                                                |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| **Orchestrator**   | requirements, commit contracts, acceptance tests, red proof, review, verification, staging, commits |
+| **Implementer**    | production code and repairs, nothing else                                                           |
+| **Checker agents** | executing declared stage gates in independent fresh contexts; never repair                          |
+| **Control agent**  | optional review of a finished cycle against its contract on larger plans                            |
+| **Auditor**        | independent, requirement-first completeness acceptance in a fresh context                           |
 
-## Install
+Checker agents never see the implementer's transcript.
 
-Requires Claude Code, Python 3.8 or newer, and git.
+The Auditor never receives an “all done” summary.
+
+---
+
+# The cycle per commit
+
+## 1. Commit contract
+
+Every cycle begins with a contract small enough to remain:
+
+* atomic,
+* independently checkable,
+* revertible.
+
+Each acceptance criterion carries requirement provenance so a criterion cannot be quietly back-derived from implementation that already exists.
+
+---
+
+## 2. Red before implementation
+
+The orchestrator writes the binding acceptance tests **before production implementation** and proves that they fail for the intended reason.
+
+Three forms of red are valid.
+
+### Behavior red
+
+An interface already exists, but its behavior does not yet satisfy the new contract.
+
+### Contract red
+
+The contract deliberately introduces a new symbol.
+
+In that case a `ModuleNotFoundError` can be the expected proof rather than evidence that test setup is broken.
+
+### Scenario red
+
+An acceptance criterion is represented by a Gherkin scenario.
+
+A failing step or missing step definition can constitute the red proof. The `.feature` file and its step skeletons are frozen as specification rather than treated as production implementation.
+
+The following never count as valid red:
+
+* syntax errors,
+* incorrect import paths,
+* broken fixtures.
+
+Because contract red exists, the orchestrator does not need to create a fake production stub merely to make a test importable.
+
+---
+
+## 3. Mechanical freeze
+
+Acceptance tests are staged and frozen by patch fingerprint.
+
+Only the orchestrator touches the Git index.
+
+If a frozen test changes later, the harness detects the changed hash mechanically rather than relying on someone noticing it during review.
+
+---
+
+## 4. Delegated implementation
+
+The Implementer receives:
+
+* the commit contract,
+* requirement provenance,
+* the red proof,
+* expected change surface,
+* explicit non-goals.
+
+It writes production code.
+
+It does not stage, commit, edit frozen acceptance tests or decide whether its work passes.
+
+---
+
+## 5. Verification gate
+
+The first verification step is the freeze check.
+
+If the acceptance contract changed, later review is meaningless.
+
+After the freeze check:
+
+1. targeted tests run;
+2. every changed hunk is read directly;
+3. each acceptance criterion receives a concrete proof;
+4. scope is checked for unintended changes.
+
+A green test suite alone is not sufficient.
+
+---
+
+## 6. Bounded repair
+
+A finding becomes a precise defect contract and returns to the Implementer.
+
+The full suite does not have to run on every repair iteration unless the repair touches:
+
+* shared core code,
+* public interfaces,
+* persistence,
+* audit behavior,
+* security boundaries,
+* idempotency.
+
+After **two failed repairs for the same defect**, the commit returns to planning rather than entering an unlimited patch loop.
+
+---
+
+## 7. Commit gate
+
+Before commit:
+
+* full suite passes;
+* complete diff has been reviewed;
+* contract is met;
+* no scope creep remains;
+* the change is atomic and revertible.
+
+All evidence is then bound to the current content fingerprint.
+
+One passed gate authorizes **exactly one commit**.
+
+---
+
+## 8. Requirement-first audit
+
+The final Auditor starts in a fresh context.
+
+It does not receive implementation justifications, repair history or prior completion summaries.
+
+Instead it independently interprets the original requirements, runs tests and demos itself, creates its own probes, and grades every requirement as:
+
+* met and proven;
+* partially met;
+* not met;
+* not provable.
+
+The final claim is therefore not:
+
+> “the feature is correct”
+
+but:
+
+> **the feature demonstrably matches the specified requirements, to the extent covered by the recorded verification and audit.**
+
+---
+
+# The whole harness on one page
+
+Everything below exists today. Whether each mechanism has measured value is separated explicitly from whether it is implemented.
+
+## Decision layer
+
+### Self-triage
+
+Part 0 classifies the task as:
+
+* `solo`
+* `light`
+* `full`
+
+The agent makes the judgment itself, records it, and the user can override it explicitly.
+
+---
+
+## Specification layer
+
+### Commit contracts
+
+Every criterion carries requirement provenance.
+
+### Red proof
+
+Three supported forms:
+
+* behavior red;
+* contract red;
+* scenario red.
+
+The CLI refuses to record a red run whose command exited `0`.
+
+### Frozen acceptance specification
+
+Acceptance tests are patch-fingerprinted before implementation.
+
+Gherkin `.feature` files and their step skeletons can participate in the frozen specification.
+
+---
+
+## Role-separation layer
+
+### Implementer
+
+A delegated fresh-context agent writes production code and repairs only.
+
+It never:
+
+* stages;
+* commits;
+* touches frozen tests;
+* accepts itself.
+
+### Checker
+
+Each declared gate runs in its own fresh Checker context.
+
+Checkers execute the check themselves, never repair, and never see Implementer transcripts.
+
+### Control
+
+Optional on larger plans.
+
+Reviews the completed cycle against the contract before block-level audit.
+
+### Auditor
+
+Fresh, requirement-first context.
+
+Never sees “all done” summaries.
+
+---
+
+## Stage-gate layer
+
+Contracts can opt into:
+
+* static analysis;
+* quality ceilings;
+* coverage;
+* mutation testing;
+* seed-pinned property testing;
+* dependency-structure checks;
+* end-to-end scenario checks.
+
+Their evidence status differs; see **Evidence status** below.
+
+---
+
+## Mechanical-enforcement layer
+
+Hooks deny:
+
+* production edits before a cycle or logged exemption exists;
+* commits without a passed commit gate;
+* commits after verified content changes;
+* reuse of one gate for multiple commits;
+* modification of frozen acceptance tests.
+
+A content fingerprint binds evidence to:
+
+* `HEAD`;
+* the contents of every modified file;
+* the contents of every untracked file.
+
+Staging reviewed production code does not alter that fingerprint.
+
+Editing one byte of verified content does.
+
+There is also:
+
+* a worktree snapshot guard;
+* bounded repair attempts;
+* one evidence-ledger entry per commit.
+
+---
+
+## Science layer
+
+The reported benchmark uses:
+
+* paired runs;
+* hidden test suites the agent never sees;
+* reference and witness implementations proving fixtures distinguish correct from plausibly incorrect behavior;
+* decision rules registered before the first run.
+
+Benchmark verdicts are re-derived from raw data by a fresh context.
+
+The workflow's own refinement process uses typed, judged and rollbackable proposals.
+
+A proposal that weakens a gate cannot enter the refinement ledger without declaring a measurement obligation.
+
+The first refinement round is on record, including a proposal rejected by its own judge.
+
+---
+
+# Install
+
+Requires:
+
+* Claude Code;
+* Python 3.8 or newer;
+* Git.
 
 ```bash
 git clone https://github.com/BernhardJackiewicz/icca-harness.git
@@ -391,332 +739,779 @@ cd icca-harness
 ./install.sh
 ```
 
-The installer copies the skill to `~/.claude/skills/`, the gate CLI to
-`~/.claude/red-proof/`, and merges the two `PreToolUse` hooks into
-`~/.claude/settings.json` after making a backup. It is idempotent.
+The installer:
 
-Then add the block from `examples/CLAUDE.md.snippet` to your global
-`~/.claude/CLAUDE.md`, so the skill is loaded before the first
-production-code change instead of after it.
+* copies the skill into `~/.claude/skills/`;
+* copies the gate CLI into `~/.claude/red-proof/`;
+* merges two `PreToolUse` hooks into `~/.claude/settings.json`;
+* creates a settings backup first.
 
-Verify in a fresh terminal: `/skills` lists the skill, `/hooks` shows
-both gates.
+It is idempotent.
 
-## Usage
+Then add the contents of:
 
-### What happens when you just ask for a change
+```text
+examples/CLAUDE.md.snippet
+```
 
-You do not invoke any of this by hand. You state the task; the skill
-loads because it is registered as the mandatory workflow; its Part 0
-triage runs as the first step and the agent classifies the task
-itself:
+to the global:
 
-- **solo**: the agent records a logged exemption with a
-  `triage: solo` reason and implements directly in the session.
-- **light**: the agent runs the full cycle below (contract, red,
-  freeze, delegated implementation, suites, diff review, commit gate)
-  with no extra gates. This is the default for real work.
-- **full**: only when the criteria demand it, the cycle additionally
-  declares `--require` gates run by independent checker agents.
+```text
+~/.claude/CLAUDE.md
+```
 
-The classification is a logged judgment, not a classifier program:
-every path leaves a record (an exemption line or a contract), the
-hooks refuse production edits before one exists, and a word from you
-("solo", "full cycle") overrides the triage. When the call is
-genuinely borderline, the agent takes the higher tier: a too-careful
-classification costs tokens, a too-loose one ships unchecked code.
+That makes the workflow load before the first production-code edit rather than after it.
 
-### The gate CLI underneath
+Verify from a fresh terminal:
+
+```text
+/skills
+/hooks
+```
+
+`/skills` should list the installed skill and `/hooks` should show both gates.
+
+---
+
+# Usage
+
+## What happens when you simply ask for a change
+
+You do not manually invoke the workflow for normal work.
+
+State the task.
+
+The registered skill loads and Part 0 performs self-triage.
+
+### `solo`
+
+For a genuinely small task, the agent records a logged exemption such as:
+
+```text
+triage: solo
+```
+
+and implements directly in the current session.
+
+### `light`
+
+Runs the core cycle:
+
+```text
+contract
+-> red
+-> freeze
+-> delegated implementation
+-> verification
+-> suites
+-> diff review
+-> commit gate
+```
+
+No additional stage gates are required.
+
+This is the default for substantial ordinary work.
+
+### `full`
+
+Uses the same core cycle but additionally declares `--require` gates when the contract justifies them.
+
+The triage is a logged judgment, not a separate classifier program.
+
+Every path leaves evidence:
+
+* an exemption line; or
+* an active contract.
+
+Hooks refuse production-code changes before one exists.
+
+A user can override the judgment with instructions such as:
+
+```text
+solo
+full cycle
+```
+
+When classification is genuinely borderline, the workflow chooses the higher tier:
+
+a too-careful classification costs tokens; a too-loose classification can ship unchecked code.
+
+---
+
+# Gate CLI
+
+A typical cycle looks like this:
 
 ```bash
 RP() { python3 ~/.claude/red-proof/red_proof.py "$@"; }
 
-RP contract --file <contract.md>          # phase CONTRACT_CREATED, resets the cycle
+RP contract --file <contract.md>
 RP red --test <name> --type contract|behavior --expected "<reason>" -- <testcmd>
-git add <acceptance-tests> && RP freeze   # phase TESTS_FROZEN, patch fingerprint
-# implementation happens in a delegated subagent here
+
+git add <acceptance-tests>
+RP freeze
+
+# delegated implementation
+
 RP check freeze
 RP check targeted -- <testcmd>
 RP check full-suite -- <suitecmd>
+
 RP attest --diff-reviewed --contract-ok
-RP commit-gate                            # binds all evidence to the current code state
-git commit ...                            # allowed now, exactly one commit per gate
-RP status                                 # phase, fingerprints, evidence
-RP exempt --reason "<why>"                # classified exceptions only, logged
+RP commit-gate
+
+git commit ...
+
+RP status
+RP exempt --reason "<why>"
 ```
 
-Note for zsh users: put the CLI in a shell function as shown. A variable
-holding the command is not word-split.
+`RP contract` creates `CONTRACT_CREATED` and resets the cycle.
 
-## What is actually enforced
+`RP freeze` moves the acceptance specification into the frozen phase.
 
-The distinction matters, so it is stated plainly.
+`RP commit-gate` binds all accumulated evidence to the current code state.
 
-**Instructed**, meaning the model can in principle deviate: everything
-in the skill body. Contract quality, review depth, audit rigor.
+Exactly one commit can consume a gate.
 
-**Enforced**, meaning a hook denies the tool call:
+### zsh note
 
-- production-code edits in a repository with no active cycle, or with
-  the acceptance tests not yet frozen,
-- `git commit` without a passed commit gate,
-- `git commit` when the code changed after verification, because all
-  evidence is bound to a content fingerprint (HEAD plus the content of
-  every modified and untracked file). Staging does not change that
-  fingerprint, so `git add` of reviewed production code is fine, while a
-  single edited line invalidates the gate,
-- a second commit on the same gate: one gate, one commit,
-- any modification of a frozen acceptance test, detected by comparing
-  the staged patch hash.
+Use a shell function as shown above.
 
-**Produced by the tool, not claimed by the model:** the red proof (the
-CLI runs the command and refuses to record a red that exited 0), the
-targeted and full-suite results, and the fingerprints. The only
-model-attested items are `--diff-reviewed` and `--contract-ok`, because
-reading a diff and checking a criterion cannot be delegated to a script.
+A variable containing the command is not word-split by zsh in the same way.
 
-## Stage gates in this repository
+---
 
-Beyond the base cycle, contracts can declare constraint gates with
-`--require`. Each declared gate is run by an independent checker agent
-with fresh context (see the skill, section 6.6) and recorded as
-fingerprint-bound evidence. The reference tool choice for this
-repository:
+# What is actually enforced
 
+The distinction between instructions and mechanical guarantees matters.
+
+## Instructed
+
+These depend on model behavior and can in principle be violated:
+
+* contract quality;
+* review depth;
+* requirement interpretation;
+* audit rigor.
+
+---
+
+## Mechanically enforced
+
+A hook denies the tool call when:
+
+* production code is edited in a repository with neither an active cycle nor logged exemption;
+* production code is edited before the acceptance tests are frozen;
+* `git commit` is attempted without a passed commit gate;
+* `git commit` is attempted after the verified code state changed;
+* a second commit attempts to reuse the same passed gate;
+* a frozen acceptance test was modified.
+
+Frozen-test integrity is checked through its staged patch hash.
+
+Commit evidence uses a broader content fingerprint covering `HEAD` plus every modified and untracked file.
+
+That distinction lets `git add` stage already-reviewed production code without invalidating evidence while still causing an actual content edit to invalidate the gate.
+
+---
+
+## Produced by the tool, not merely claimed
+
+The CLI itself produces:
+
+* red-proof command result;
+* targeted-test result;
+* full-suite result;
+* content fingerprints.
+
+It refuses to record red proof when the red command exits successfully.
+
+Two parts remain model-attested:
+
+```text
+--diff-reviewed
+--contract-ok
 ```
-RP check static -- sh -c "ruff check bin/ bench/*.py && xenon --max-absolute C bin/"
-RP check quality -- sh -c "xenon --max-absolute C --max-modules B --max-average A bin/ && python3 -c \"import pathlib, sys; big = [str(p) for p in pathlib.Path('bin').rglob('*.py') if len(p.read_text().splitlines()) > 1200]; sys.exit(1 if big else print('module sizes ok'))\""
-RP check deps -- sh -c "python3 tools/deps_check.py --policy deps-policy.json"
-RP check e2e -- sh -c "python3 tools/run_scenarios.py --config e2e-scenarios.json"
-RP check coverage --min 40 -- sh -c "python3 -m coverage run -m pytest -q tests/ && python3 -m coverage report --include='bin/red_proof.py'"
-RP check mutation --min 80 -- sh -c "mutmut run && mutmut results"
-RP check property -- python3 -m pytest -q tests/ --hypothesis-seed=1234
-```
 
-A failed check arms a worktree snapshot guard: rerunning the same
-command on an unchanged tree does not execute it, the attempt still
-counts (`contract --max-attempts`, default 5), and exhausting the budget
-tells the cycle to stop repairing and re-plan. A corrected command does
-run on that same tree, because a wrong command is repaired without
-touching a file, and its failure counts on from the previous attempt.
+A script can run a test or hash files.
 
-`--min` applies to the gates whose number comes out of the run. The
-property gate is not one of them: its metric is the seed the caller
-passed in, and a threshold on an input grades the input instead of the
-run, so `--min` on it is refused before anything is executed.
+It cannot determine whether a human-language requirement was interpreted correctly or whether a diff was reviewed intelligently.
 
-`quality` is the ceilings gate (complexity and module size), separate
-from `static`, which carries the lint ruleset; a ceiling belongs in the
-command, so the gate is exit-code gated and refuses `--min` like every
-check without an extractor. The ceilings above are this repository's
-honest current numbers: the worst block in `bin/` ranks C, the module
-average ranks A, and the only module under `bin/` is 1072 lines against
-the 1200-line cap.
+---
 
-`deps` and `e2e` are the two newest opt-in gates, and both are built
-but unmeasured: they are not part of the benchmark yet and their value
-hypotheses are deliberately not registered, so nothing here claims that
-either stage pays for itself. `deps` checks the import graph of
-first-party code against a declared policy: no cycles, and only the
-layering the policy allows. `e2e` drives the built artifact through its
-declared entry point, so the wired whole is exercised rather than its
-units. Both are exit-code gates on purpose: a violation count has no
-floor semantics, and a half-passing scenario run is a failed run, so
-there is no number for `--min` to grade. The commands above are the
-shape a project declares; the CLI runs what it is given and the
-checking itself lives in the project's own tools.
+# Stage gates
 
-Thresholds are set per contract, not globally: a cheap gate runs on
-every declaring commit, an expensive one only on block-closing
-contracts. Two honest notes on the numbers above. The complexity
-ceiling is C because four long-standing blocks in the gate CLI sit
-there today; tightening to B is a refactoring goal, not a claim. And
-the coverage floor is 40 because the measured line coverage of
-`bin/red_proof.py` is 43% today. That figure is low for a reason worth
-knowing rather than hiding: `tests/` drives the CLI through
-subprocesses, and line coverage does not see what runs in a child
-process, so the suite is credited with far less than it actually
-exercises. Both numbers are this project's choices at this point in its
-life. They are not floors anyone else should adopt: pick thresholds
-your own repository can meet honestly. The mutation and property lines
-are tool-choice examples rather than gates this repository currently
-meets: neither mutmut nor the hypothesis plugin is a dependency here,
-so copy them only into a project that carries those tools.
+Beyond the base cycle, a contract can declare optional constraints through `--require`.
 
-One more honesty note, because this section would otherwise imply more
-than was measured. Whether these gates pay for themselves has been
-tested in a private development extension of this repository: a paired
-benchmark against hidden test suites the agent never sees, under
-pre-registered decision rules, nine registered hypotheses of which
-eight carry verdicts. The short version is narrow. The stage-1 gate (visible suite plus coverage floor)
-earned its accept only for a weak implementer model working from an
-example-specified task, where it converts plausible near-misses into
-hidden passes; the same gate showed no effect for frontier or mid-tier
-implementers, and none when the task states its rules outright. The
-mutation and property stages each converted an occasional blind spot of
-the stage-1 gate but neither earned its cost under the registered
-rules. The fix-shaped task class, long unmeasurable because the
-default orchestrator refused at the sight of bug code, became
-measurable under a recorded orchestrator choice and showed the same
-picture: both arms hidden-green throughout, nothing for the gate to
-convert. And on the small-task class, implementing directly in the
-session lost no hidden passes against delegation at less than half
-the median cost, which is why the skill now opens with a recorded
-self-triage (Part 0: solo, light, full) instead of a blanket rule.
-Treat the gates above as mechanisms with a narrow, measured
-value window, not as universally paid-for protection, and expect their
-main worth on real work to be the discipline they enforce rather than a
-measured defect reduction.
+Each declared gate is executed by an independent Checker agent in a fresh context and recorded as fingerprint-bound evidence.
 
-## Tested and untested, in one place
-
-Everything below was measured in the development benchmark: paired
-runs against hidden test suites the agent never sees, decision rules
-registered before the first run, every verdict re-derived by a fresh
-context from the raw data.
-
-Measured:
-
-- **Delegation pays on implementation-heavy work, and only there.**
-  28% fewer tokens on the expensive model at an identical success rate
-  (16,576 to 11,864), while total tokens across both models rose 37%.
-  On the small one-module task the same setup cost 7% more on the
-  expensive model and 119% more in total.
-- **Small, fully specified tasks do not need the harness.** Direct
-  implementation in the session lost no hidden-suite passes against
-  delegation over 12 pairs, at 0.45x the median cost, all runs
-  hidden-green. This is the measured basis of the solo tier in the
-  skill's Part 0.
-- **The stage-1 gate has one narrow value window.** It converted
-  plausible near-misses into hidden passes only for a weak implementer
-  working from an example-specified task (net +4 over 25 pairs, 1.48x
-  cost). With a frontier implementer: net 0. With a mid-tier
-  implementer: net -1 over 12 pairs. On tasks that state their rules
-  outright: all ties.
-- **Mutation and property stages do not earn their cost.** Each
-  converted an occasional blind spot the cheaper gates missed; the
-  mutation stage did it at 3.08x the cost median against a registered
-  2.0x limit, the property stage's evidence never left 1.5 against an
-  accept threshold of 20 before the registered budget stop.
-- **Fix-shaped tasks are solvable without a gate.** Once measurable
-  under a recorded orchestrator choice (zero refusal aborts in 64
-  runs), both arms were hidden-green throughout: 32 ties out of 32
-  pairs, nothing for the gate to convert.
-
-Not measured, stated as such:
-
-- **The quality-ceilings gate.** Built and documented above; its
-  hypothesis is registered but unfunded. Until measured it is a
-  mechanism, not a claim.
-- **The real Claude Code loop.** All numbers come from a harness that
-  imitates the loop. Running the same tasks through real sessions on
-  two separate keys would close the gap and has not been done.
-- **Realistic repositories.** The benchmark runs on small synthetic
-  packages; one brownfield fixture (a working multi-module package
-  with a feature ask) exists as measurement surface and has not been
-  measured on.
-- **Dependency-structure and end-to-end stages.** Built and tested,
-  not measured: both exist as opt-in CLI gates and as full bench
-  stages in the development benchmark (runners, arms, observing
-  after-measures with preregistered start criteria, held-in and
-  held-out fixtures with reference and witness overlays). No model
-  has run against them and no hypothesis is registered; until the
-  after-measures justify a measurement, they are mechanisms, not
-  claims.
-- **Field causality.** A descriptive field report can count cycles,
-  gate runs and findings; whether the workflow reduces regressions in
-  real work has no comparison arm and therefore no number. A
-  prospective design exists on paper.
-- **Transfer to other pairings.** The numbers are bound to the
-  measured model pairs and to one developer's tasks and style. Other
-  orchestrators and implementers, including local models, inherit the
-  mechanics, not the numbers.
-
-## Limits
-
-Stated deliberately, because a workflow that overclaims is the thing
-this repository argues against.
-
-- The measured saving is 28% of expensive-model tokens on one task shape,
-  from 16 runs on two synthetic tasks in throwaway repositories, driven by
-  a harness that imitates the Claude Code loop rather than being it, at a
-  fixed `medium` effort and with contexts under 5000 tokens. It is a
-  first, narrow measurement, not a benchmark suite. Nothing in it supports
-  a larger number, and it says nothing about total cost, which did not
-  drop.
-- The measurement ran through a harness that imitates the Claude Code
-  loop rather than being it. Running the same tasks through real Claude
-  Code sessions billed to two separate API keys would close that gap and
-  has not been done.
-- The hooks are process CI, not a security boundary. They fail open on
-  internal errors and can be switched off locally by whoever owns the
-  machine.
-- Commits made from a plain terminal outside Claude Code are not gated.
-  Add a `pre-commit` hook or CI if you need that.
-- The commit gate has to decide which repository a shell command commits
-  into, and it does that without a shell parser. It honors a leading
-  `cd <dir>` and a `git -C <dir>` that belongs to the commit invocation
-  itself. Everything else falls back to the reported working directory:
-  a non-leading `cd` (`ls && cd other && git commit`), chained `cd`,
-  subshells, variables or escaped spaces in the path, aliases, and
-  environment-prefixed invocations. In those shapes a commit into a
-  second repository is judged against the session repository, which can
-  allow an ungated commit. Keep one repository per session, or add a
-  `pre-commit` hook for a guarantee that does not depend on reading the
-  command line.
-- The attestation step remains model-attested.
-- The method proves conformance with the specification that was checked.
-  It does not prove the specification was right. A misunderstood
-  requirement can be implemented perfectly and pass every gate. The
-  requirement-first audit is the mitigation, not a guarantee.
-- State is keyed per repository, not per session, so a delegated
-  subagent and the orchestrator see the same gate.
-- Tested on macOS. Path handling for temporary directories is
-  POSIX-oriented.
-
-## Repository layout
-
-| Path | Purpose |
-|---|---|
-| `skills/icca-harness/SKILL.md` | the workflow as an installable Claude Code skill (English, default) |
-| `skills/icca-harness/SKILL.de.md` | the same skill in German, the language it was written in |
-| `bin/red_proof.py` | gate CLI and hook entry point, no dependencies |
-| `examples/settings-hooks.json` | the hook block, for manual merging |
-| `examples/CLAUDE.md.snippet` | the global instruction that triggers the skill |
-| `tests/` | the gate CLI's own pytest suite, 324 tests covering the state machine, the checks, the fingerprints and the hooks |
-| `test/smoke_test.sh` | 21 checks covering every deny path, the happy path and repository resolution |
-| `install.sh` | idempotent installer with a settings backup |
-| `bench/bench.py` | the paired benchmark, with hard cost gates |
-| `bench/results.json` | raw per-run data for the 16 reported runs |
-| `bench/README.md` | the method, and what it cannot tell you |
-
-Two names, one thing: the skill and this repository are `icca-harness`,
-after the four separated roles the method rests on (Implementer,
-Checker, Control, Auditor) and the harness that keeps them apart; the
-name is model-neutral on purpose, because the mechanics are. The
-verification mechanism inside is called red-proof, after the
-part of it that is unusual: it is not enough that tests exist, the red
-itself has to be established as a valid proof before implementation
-starts.
-
-## Language
-
-English is the default. The installer picks which skill body it writes:
+For this repository, the reference commands are:
 
 ```bash
-./install.sh              # English (default)
-./install.sh --lang de    # the German original
+RP check static -- sh -c \
+  "ruff check bin/ bench/*.py && xenon --max-absolute C bin/"
+
+RP check quality -- sh -c \
+  "xenon --max-absolute C --max-modules B --max-average A bin/ && \
+   python3 -c \"import pathlib, sys; big = [str(p) for p in pathlib.Path('bin').rglob('*.py') if len(p.read_text().splitlines()) > 1200]; sys.exit(1 if big else print('module sizes ok'))\""
+
+RP check deps -- sh -c \
+  "python3 tools/deps_check.py --policy deps-policy.json"
+
+RP check e2e -- sh -c \
+  "python3 tools/run_scenarios.py --config e2e-scenarios.json"
+
+RP check coverage --min 40 -- sh -c \
+  "python3 -m coverage run -m pytest -q tests/ && \
+   python3 -m coverage report --include='bin/red_proof.py'"
+
+RP check mutation --min 80 -- sh -c \
+  "mutmut run && mutmut results"
+
+RP check property -- \
+  python3 -m pytest -q tests/ --hypothesis-seed=1234
+```
+
+---
+
+## Failed-check snapshot guard
+
+A failed check arms a worktree snapshot guard.
+
+If the exact same command is rerun against an unchanged tree, the command does not execute again.
+
+The attempt still counts against the contract's attempt budget:
+
+```text
+contract --max-attempts
+```
+
+Default:
+
+```text
+5
+```
+
+Exhausting that budget tells the cycle to stop repairing and return to planning.
+
+A corrected command is allowed to execute against the same tree because repairing an incorrect check command should not require a code edit.
+
+Its attempt count continues from the previous failure.
+
+---
+
+## Threshold semantics
+
+`--min` only applies to gates whose executed result emits a meaningful measured value.
+
+### Property gate
+
+The property gate's recorded metric is the random seed supplied by the caller.
+
+A threshold on that input would grade the input rather than the execution, so `--min` is rejected before execution.
+
+### Quality gate
+
+`quality` is a ceilings gate.
+
+Limits such as complexity and module size belong inside the invoked command.
+
+It therefore behaves as an exit-code gate and rejects `--min`.
+
+### Static gate
+
+`static` is separate from `quality` and carries the lint/static-analysis ruleset.
+
+---
+
+## Repository-specific thresholds
+
+The example thresholds above describe this repository's current state, not universal recommendations.
+
+The complexity ceiling is currently **C** because four long-standing blocks in the gate CLI rank C.
+
+Moving them to B is a refactoring target, not a claim about today's code.
+
+The module average ranks **A**.
+
+The only module under `bin/` is currently **1,072 lines**, under the declared **1,200-line** ceiling.
+
+The coverage floor is currently **40%**.
+
+Measured line coverage for `bin/red_proof.py` is **43%**.
+
+That apparently low number has a specific cause: `tests/` drives much of the CLI through subprocesses, while the line-coverage process does not observe execution inside the child process. The recorded line-coverage percentage therefore credits less execution than the test suite actually performs.
+
+These numbers are project-specific.
+
+Do not copy them blindly into another repository.
+
+The mutation and property commands are examples of tool choices rather than gates this repository currently satisfies: neither `mutmut` nor the Hypothesis plugin is a dependency here.
+
+---
+
+## Dependency and end-to-end gates
+
+`deps` and `e2e` are the two newest optional stages.
+
+Both are:
+
+* built;
+* tested;
+* unmeasured.
+
+Neither currently carries a claim that it pays for itself.
+
+### `deps`
+
+Checks the import graph of first-party code against a declared dependency policy:
+
+* no cycles;
+* only permitted layering.
+
+It is deliberately an exit-code gate.
+
+A violation count has no useful floor semantics.
+
+### `e2e`
+
+Runs the wired artifact through its declared entry point rather than only exercising isolated units.
+
+It is also an exit-code gate.
+
+A partially passing scenario set is still a failed scenario run, so there is no meaningful `--min` threshold to grade.
+
+The CLI executes the command supplied by the project; the actual dependency and scenario checks live in project-specific tools.
+
+Thresholds are declared per contract rather than globally.
+
+Cheap checks can run on every declaring commit.
+
+Expensive checks belong on contracts whose risk justifies them, especially block-closing changes to critical code.
+
+---
+
+# Evidence status
+
+Implemented does not mean validated.
+
+This section separates what the development benchmark has actually measured from what merely exists as a mechanism.
+
+The development benchmark uses paired runs against hidden suites that the agent never sees, with decision rules registered before the first run.
+
+A fresh context re-derived every reported verdict from the raw data.
+
+## Measured
+
+### Delegation pays on implementation-heavy work, and only there
+
+Large task:
+
+* expensive-model tokens: **16,576 → 11,864**
+* change: **-28%**
+* success: identical
+* total tokens across both models: **+37%**
+
+Small task:
+
+* expensive-model tokens: **+7%**
+* total tokens: **+119%**
+
+---
+
+### Small, fully specified tasks do not need the harness
+
+Direct implementation in the session lost no hidden-suite passes against delegation across **12 pairs**.
+
+All runs were hidden-green.
+
+Direct implementation used **0.45× the median cost**.
+
+That is the measured basis for the `solo` tier in Part 0.
+
+---
+
+### The stage-1 gate has one narrow measured value window
+
+The stage-1 gate is the visible suite plus coverage floor.
+
+For a **weak implementer** working from an **example-specified task**, it converted plausible near-misses into hidden-suite passes:
+
+* **net +4 over 25 pairs**
+* **1.48× cost**
+
+For a **frontier implementer**:
+
+* net effect: **0**
+
+For a **mid-tier implementer**:
+
+* **net -1 over 12 pairs**
+
+When the task states its rules explicitly:
+
+* all comparisons tied.
+
+So the gate has not demonstrated broad value across implementers and task specifications.
+
+---
+
+### Mutation and property stages did not earn their cost
+
+Each gate caught an occasional blind spot that the cheaper stage-1 gate missed.
+
+Neither met its registered value criterion.
+
+Mutation:
+
+* median cost: **3.08×**
+* registered limit: **2.0×**
+
+Property stage:
+
+* evidence never exceeded **1.5**
+* accept threshold: **20**
+* measurement stopped at the registered budget stop.
+
+---
+
+### Fix-shaped tasks were solvable without the gate
+
+The fix-shaped class had previously been difficult to measure because the default orchestrator refused when presented with bug code.
+
+Under a recorded orchestrator choice, the class became measurable:
+
+* **0 refusal aborts across 64 runs**
+* **32 pairs**
+* both arms hidden-green in all pairs
+* **32 ties out of 32**
+
+There was therefore no failure for the gate to convert.
+
+---
+
+## Development-extension summary
+
+The private development extension registered **nine hypotheses**, of which **eight currently have verdicts**.
+
+Its narrow conclusion is:
+
+* stage 1 helps only in the measured weak-implementer/example-specified window;
+* no effect was found for the frontier implementer;
+* the mid-tier comparison was slightly negative;
+* explicitly specified tasks produced ties;
+* mutation and property checks found occasional additional defects but failed their cost/value rules;
+* the measurable fix-shaped tasks stayed hidden-green in both arms;
+* small direct tasks were cheaper without losing hidden passes.
+
+The gates should therefore be treated as **mechanisms with a narrow demonstrated value window**, not as universally cost-effective defect reducers.
+
+Their broader practical value may be the discipline they enforce, but that has not been established as a causal benchmark result.
+
+---
+
+## Built but not measured
+
+### Quality-ceilings gate
+
+Implemented and documented.
+
+Its hypothesis is registered but unfunded.
+
+Until measured, it is a mechanism rather than an evidence-backed claim.
+
+### Dependency-structure gate
+
+Built and tested.
+
+The development benchmark contains:
+
+* runners;
+* arms;
+* observing after-measures;
+* preregistered start criteria;
+* held-in fixtures;
+* held-out fixtures;
+* reference overlays;
+* witness overlays.
+
+No model has yet been run against it and no hypothesis is registered.
+
+### End-to-end scenario gate
+
+The same status as the dependency gate:
+
+* built;
+* tested;
+* benchmark surface exists;
+* not yet measured;
+* no registered hypothesis.
+
+### Real Claude Code loop
+
+The reported numbers come from a benchmark harness that **imitates** the Claude Code loop.
+
+The equivalent tasks have not yet been run through real Claude Code sessions billed to two separate API keys.
+
+### Realistic repositories
+
+The benchmark uses small synthetic packages.
+
+A brownfield fixture exists: a working multi-module package with a feature request.
+
+It has not yet been measured.
+
+### Field causality
+
+A field report could count:
+
+* cycles;
+* gate executions;
+* findings.
+
+But without a comparison arm it cannot establish whether the workflow reduces regressions.
+
+A prospective design exists on paper; no causal number is claimed.
+
+### Transfer to other model pairings
+
+The measured numbers belong to the tested model pairs, task shapes and one developer's style.
+
+Other orchestrators, implementers or local models inherit the mechanics.
+
+They do **not** inherit the 28% result.
+
+---
+
+# Limits
+
+The limits are intentionally explicit because a workflow about evidence should not overstate its own evidence.
+
+### Narrow benchmark
+
+The 28% reduction was measured on:
+
+* one implementation-heavy task shape;
+* 16 runs across two synthetic tasks;
+* throwaway repositories;
+* fixed `medium` effort;
+* contexts below 5,000 tokens;
+* a harness that imitates the Claude Code interaction loop.
+
+It is a first narrow measurement, not a benchmark suite.
+
+Nothing in the data supports a larger claimed number.
+
+It also does not show a reduction in total token consumption.
+
+---
+
+### Harness versus real Claude Code
+
+The experiment uses a harness that imitates the Claude Code loop.
+
+Running equivalent tasks through actual Claude Code sessions using two separately billed API keys would reduce that external-validity gap.
+
+That experiment has not been done.
+
+---
+
+### Hooks are process CI, not a security boundary
+
+The hooks:
+
+* fail open on internal errors;
+* can be disabled locally by the machine owner.
+
+They enforce workflow discipline, not adversarial security.
+
+---
+
+### Plain-terminal commits are outside the Claude Code gate
+
+A commit performed from an ordinary terminal outside Claude Code is not intercepted by this workflow.
+
+If the repository requires enforcement independent of the Claude Code session, add:
+
+* a `pre-commit` hook;
+* CI;
+* or both.
+
+---
+
+### Repository resolution has parsing limits
+
+The commit gate must determine which repository a shell command will commit into without implementing a full shell parser.
+
+It understands:
+
+```text
+cd <dir> ...
+```
+
+when the `cd` is leading, and:
+
+```text
+git -C <dir> commit ...
+```
+
+when `-C` belongs to the commit invocation.
+
+Other forms fall back to the working directory reported by the session.
+
+Examples that are not fully interpreted include:
+
+```text
+ls && cd other && git commit
+```
+
+as well as:
+
+* chained `cd` commands;
+* subshells;
+* path variables;
+* escaped spaces in paths;
+* aliases;
+* environment-prefixed invocations.
+
+In those shapes, a commit targeting a second repository can be judged against the session repository and can therefore allow an ungated commit.
+
+Keep one repository per session, or add a repository-native `pre-commit` hook if you need a guarantee that does not depend on interpreting the shell command.
+
+---
+
+### Attestation remains model-attested
+
+The harness can prove that commands ran and content hashes matched.
+
+It cannot mechanically prove that:
+
+```text
+--diff-reviewed
+--contract-ok
+```
+
+were judged correctly.
+
+---
+
+### Specification correctness is outside the proof
+
+The method proves conformance with the specification that was checked.
+
+It does not prove that the specification itself was correct.
+
+A misunderstood requirement can be implemented perfectly and pass every gate.
+
+The requirement-first Auditor mitigates that failure mode.
+
+It does not eliminate it.
+
+---
+
+### State is repository-scoped
+
+Workflow state is keyed by repository rather than Claude Code session.
+
+That is intentional: a delegated Implementer and the Orchestrator must see the same gate state.
+
+---
+
+### Platform coverage
+
+The harness has been tested on macOS.
+
+Temporary-directory path handling is POSIX-oriented.
+
+---
+
+# Repository layout
+
+| Path                              | Purpose                                                                 |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| `skills/icca-harness/SKILL.md`    | installable Claude Code workflow, English default                       |
+| `skills/icca-harness/SKILL.de.md` | synchronized German original                                            |
+| `bin/red_proof.py`                | dependency-free gate CLI and hook entry point                           |
+| `examples/settings-hooks.json`    | hook configuration for manual merging                                   |
+| `examples/CLAUDE.md.snippet`      | global instruction that triggers the skill                              |
+| `tests/`                          | 347 pytest tests covering state machine, checks, fingerprints and hooks |
+| `test/smoke_test.sh`              | 21 checks covering deny paths, happy path and repository resolution     |
+| `install.sh`                      | idempotent installer with settings backup                               |
+| `bench/bench.py`                  | paired benchmark with hard spend limits                                 |
+| `bench/results.json`              | raw data for the 16 headline runs                                       |
+| `bench/README.md`                 | benchmark method and limitations                                        |
+
+---
+
+# Naming
+
+The repository and installable skill are both called:
+
+```text
+icca-harness
+```
+
+ICCA refers to the four separated roles:
+
+```text
+Implementer
+Checker
+Control
+Auditor
+```
+
+The name is deliberately model-neutral because the separation mechanics are model-neutral.
+
+The verification mechanism inside the harness is called:
+
+```text
+red-proof
+```
+
+The unusual part is the requirement that red itself be established as valid evidence before implementation begins.
+
+It is not enough for acceptance tests merely to exist.
+
+---
+
+# Language
+
+English is the default install language.
+
+```bash
+./install.sh
+./install.sh --lang de
 SKILL_LANG=de ./install.sh
 ```
 
-Both files live in `skills/icca-harness/` as `SKILL.md` and
-`SKILL.de.md`, and both carry the same English frontmatter description,
-which is what triggers automatic loading, so auto-invocation behaves
-identically either way. The German file is the original the method was
-written in and is kept in sync rather than archived. Another language is
-welcome as a pull request: add `SKILL.<code>.md` and one line to the
-`case` in `install.sh`.
+Both language versions live in:
 
-## License
+```text
+skills/icca-harness/
+```
 
-MIT. See [LICENSE](LICENSE).
+as:
+
+```text
+SKILL.md
+SKILL.de.md
+```
+
+Both use the same English frontmatter description, so automatic invocation behaves the same way regardless of which body is installed.
+
+The German file is the original language in which the method was written and is maintained in sync rather than archived.
+
+Additional languages are welcome as pull requests:
+
+```text
+SKILL.<code>.md
+```
+
+plus the corresponding entry in the `case` statement in `install.sh`.
+
+---
+
+# License
+
+MIT. See `LICENSE`.
