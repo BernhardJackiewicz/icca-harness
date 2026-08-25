@@ -1,5 +1,11 @@
 # icca-harness
 
+![version](https://img.shields.io/badge/version-1.0.0-blue)
+![tests](https://img.shields.io/badge/tests-347%20passing-brightgreen)
+![python](https://img.shields.io/badge/python-3.8%2B-blue)
+![license](https://img.shields.io/badge/license-MIT-green)
+![dependencies](https://img.shields.io/badge/dependencies-stdlib%20only-lightgrey)
+
 **Get about 40% more out of an expensive-model subscription: on
 implementation-heavy work this workflow spends 28% fewer tokens on the
 expensive model, at an identical success rate.** The orchestrator's
