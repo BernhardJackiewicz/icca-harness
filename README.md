@@ -10,6 +10,62 @@ ICCA names the four separated roles that carry the method: Implementer,
 Checker, Control, Auditor. The harness is the machinery around them, not
 an agent itself.
 
+```
+                              the task
+                                 |
+                                 v
+               Part 0 self-triage: solo | light | full
+              (no harness / plain cycle / cycle + gates)
+                                 |
+                                 v
+ +-----------------------------------------------------------------+
+ |  ORCHESTRATOR                                                   |
+ |  commit contract with requirement provenance; acceptance tests  |
+ |  written FIRST and proven red (behavior red, contract red, or   |
+ |  gherkin scenario red), then frozen by patch fingerprint so     |
+ |  nobody can weaken them later                                   |
+ +--------------------------------+--------------------------------+
+                                  | delegate, fresh context
+                                  v
+ +-----------------------------------------------------------------+
+ |  I  IMPLEMENTER                                                 |
+ |     the only role that writes production code, surrounded by    |
+ |     the constraints: never stages, never commits, cannot touch  |
+ |     the frozen tests, never accepts its own work                |
+ +--------------------------------+--------------------------------+
+                                  |
+                the gauntlet: each gate opt-in per contract
+                                  |
+ +--------------------------------v--------------------------------+
+ |  C  CHECKER agents: one fresh context per gate, never repair,   |
+ |     never see the implementer's transcript                      |
+ |                                                                 |
+ |     unit tests + coverage floor      static analysis            |
+ |     quality metrics (ceilings)       mutation testing           |
+ |     property tests (seed-pinned)     dependency structure       |
+ |     e2e scenarios: QA procedures driving the wired artifact     |
+ +--------------------------------+--------------------------------+
+                                  |
+      a finding becomes a defect contract and goes back to I
+      (at most two repairs per defect, then re-planning)
+                                  |
+                                  v
+ +-----------------------------------------------------------------+
+ |  C  CONTROL agent (optional, larger plans): checks the          |
+ |     finished cycle against its contract, fresh context          |
+ +--------------------------------+--------------------------------+
+                                  v
+       commit gate: every piece of evidence is bound to the exact
+       code state by fingerprint; one gate, exactly one commit
+                                  |
+                                  v
+ +-----------------------------------------------------------------+
+ |  A  AUDITOR: fresh context, interprets the original             |
+ |     requirements itself, runs the tests and builds its own      |
+ |     probes, never sees an "all done" summary                    |
+ +-----------------------------------------------------------------+
+```
+
 Measured over 16 paired runs, not estimated: cost is read from the `usage`
 field of every response and the raw per-run data ships in this repository.
 
