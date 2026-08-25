@@ -291,6 +291,11 @@ value is stated further down, honestly.
    edits) and a seed-enforced property gate. Both measured: each
    converts an occasional blind spot, neither earned its cost, so
    they belong on block-closing contracts of critical code only.
+9b. A dependency-structure gate (import-graph cycles and layering
+    against a declared policy) and an end-to-end scenario gate (the
+    wired artifact driven through its declared entry point). Both
+    built and tested, neither measured; their hypotheses are
+    deliberately not yet registered.
 
 **Mechanical enforcement**
 10. Hooks deny production edits without an active cycle or logged
